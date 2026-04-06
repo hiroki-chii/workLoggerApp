@@ -1,0 +1,57 @@
+{
+  "name": "workloggerapp",
+  "version": "1.0.0",
+  "description": "",
+  "main": "electron-core/main.js",
+  "scripts": {
+    "dev:frontend": "cd frontend && npm run dev",
+    "dev:electron": "npx electron electron-core/main.js",
+    "build:frontend": "npm run build --prefix frontend",
+    "build": "npm run build:frontend && electron-builder"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "dependencies": {
+    "better-sqlite3": "^12.8.0",
+    "cors": "^2.8.6",
+    "csv-stringify": "^6.7.0",
+    "express": "^5.2.1"
+  },
+  "devDependencies": {
+    "@electron/rebuild": "^4.0.3",
+    "concurrently": "^9.2.1",
+    "electron": "^34.0.0",
+    "electron-builder": "^24.13.3",
+    "electron-is-dev": "^3.0.1",
+    "electron-packager": "^17.1.2",
+    "wait-on": "^9.0.4"
+  },
+  "build": {
+    "appId": "com.workloggerapp.app",
+    "productName": "PulseWork",
+    "directories": {
+      "output": "dist-pulse"
+    },
+    "files": [
+      "electron-core/**/*",
+      "backend/**/*",
+      "frontend/dist/**/*",
+      "assets/**/*",
+      "package.json"
+    ],
+    "asar": false,
+    "win": {
+      "target": [
+        "nsis",
+        "portable"
+      ],
+      "icon": "assets/icon.png"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true
+    }
+  }
+}
