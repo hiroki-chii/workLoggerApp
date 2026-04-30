@@ -42,6 +42,15 @@ function App() {
   const [heatmapData, setHeatmapData] = useState([]);
   const [logs, setLogs] = useState([]);
   const [settings, setSettings] = useState({ sampling_interval: '30' });
+  const [aliases, setAliases] = useState([]);
+  const [editingAliasId, setEditingAliasId] = useState(null);
+  const [editKeyword, setEditKeyword] = useState('');
+  const [editAlias, setEditAlias] = useState('');
+  const [editMatchType, setEditMatchType] = useState('contains');
+  const [editCaseSensitive, setEditCaseSensitive] = useState(false);
+  const [newMatchType, setNewMatchType] = useState('contains');
+  const [newCaseSensitive, setNewCaseSensitive] = useState(false);
+  const [windowTitles, setWindowTitles] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [activeTab, setActiveTab] = useState('dashboard');
@@ -64,11 +73,13 @@ function App() {
         endDate: dateRange.end
       }).toString();
 
-      const [statsRes, logsRes, heatmapRes, settingsRes] = await Promise.all([
+      const [statsRes, logsRes, heatmapRes, settingsRes, aliasesRes, titlesRes] = await Promise.all([
         fetch(`${API_BASE}/stats?${params}&groupBy=${groupBy}`),
         fetch(`${API_BASE}/logs?${params}`),
         fetch(`${API_BASE}/heatmap?${params}&groupBy=${groupBy}`),
-        fetch(`${API_BASE}/settings`)
+        fetch(`${API_BASE}/settings`),
+        fetch(`${API_BASE}/aliases`),
+        fetch(`${API_BASE}/window-titles`)
       ]);
 
       if (!statsRes.ok || !logsRes.ok || !heatmapRes.ok || !settingsRes.ok) {
@@ -79,11 +90,15 @@ function App() {
       const logsData = await logsRes.json();
       const heatmapData = await heatmapRes.json();
       const settingsData = await settingsRes.json();
+      const aliasesData = await aliasesRes.json();
+      const titlesData = await titlesRes.json();
 
       setStats(statsData);
       setLogs(logsData);
       setHeatmapData(heatmapData);
       setSettings(settingsData);
+      setAliases(Array.isArray(aliasesData) ? aliasesData : []);
+      setWindowTitles(Array.isArray(titlesData) ? titlesData : []);
       setError(null);
       setLoading(false);
     } catch (err) {
@@ -200,6 +215,64 @@ function App() {
     } catch (err) {
       console.error('ログの削除に失敗しました:', err);
       alert('削除に失敗しました。');
+    }
+  };
+
+  const handleAddAlias = async (keyword, alias, matchType, caseSensitive) => {
+    if (!keyword || !alias) return;
+    
+    const applyToPast = window.confirm('過去のログにもこのエイリアスを反映しますか？');
+    
+    try {
+      await fetch(`${API_BASE}/aliases`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ keyword, alias, applyToPast, matchType, caseSensitive })
+      });
+      fetchData();
+    } catch (err) {
+      console.error('エイリアスの追加に失敗しました:', err);
+    }
+  };
+
+  const handleDeleteAlias = async (id) => {
+    try {
+      await fetch(`${API_BASE}/aliases/${id}`, { method: 'DELETE' });
+      fetchData();
+    } catch (err) {
+      console.error('エイリアスの削除に失敗しました:', err);
+    }
+  };
+
+  const handleEditAliasStart = (item) => {
+    setEditingAliasId(item.id);
+    setEditKeyword(item.keyword);
+    setEditAlias(item.alias);
+    setEditMatchType(item.match_type || 'contains');
+    setEditCaseSensitive(!!item.case_sensitive);
+  };
+
+  const handleEditAliasCancel = () => {
+    setEditingAliasId(null);
+    setEditKeyword('');
+    setEditAlias('');
+  };
+
+  const handleEditAliasSave = async (id) => {
+    if (!editKeyword || !editAlias) return;
+    
+    const applyToPast = window.confirm('変更内容を過去のログにも反映しますか？');
+    
+    try {
+      await fetch(`${API_BASE}/aliases/${id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ keyword: editKeyword, alias: editAlias, applyToPast, matchType: editMatchType, caseSensitive: editCaseSensitive })
+      });
+      setEditingAliasId(null);
+      fetchData();
+    } catch (err) {
+      console.error('エイリアスの更新に失敗しました:', err);
     }
   };
 
@@ -511,7 +584,7 @@ function App() {
                       <tr>
                         <th>時刻</th>
                         <th>アプリ名</th>
-                        <th>ウィンドウタイトル</th>
+                        <th>エイリアス / ウィンドウタイトル</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -519,7 +592,16 @@ function App() {
                         <tr key={log.id}>
                           <td className="timestamp">{new Date(log.timestamp).toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}</td>
                           <td><span className="app-badge">{log.appName}</span></td>
-                          <td style={{ maxWidth: '400px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{log.windowTitle}</td>
+                          <td style={{ maxWidth: '400px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                            {log.alias ? (
+                              <>
+                                <span style={{ color: 'var(--primary)', fontWeight: '600', marginRight: '8px' }}>{log.alias}</span>
+                                <span style={{ color: '#94a3b8', fontSize: '0.85em' }} title={log.windowTitle}>({log.windowTitle})</span>
+                              </>
+                            ) : (
+                              <span title={log.windowTitle}>{log.windowTitle}</span>
+                            )}
+                          </td>
                         </tr>
                       ))}
                     </tbody>
@@ -624,6 +706,142 @@ function App() {
                         </div>
                       </div>
                     )}
+                  </div>
+
+                  <div style={{ marginBottom: '2rem', padding: '1.5rem', background: 'rgba(255,255,255,0.02)', borderRadius: '16px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '1rem' }}>
+                      <Activity size={20} color="#6366f1" />
+                      <div>
+                        <div style={{ fontWeight: '600' }}>ウィンドウタイトル・エイリアス設定</div>
+                        <div style={{ fontSize: '0.8rem', color: '#94a3b8' }}>タイトルに含まれるキーワードを別名に変換します</div>
+                      </div>
+                    </div>
+                    
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem', marginBottom: '1.5rem', background: 'rgba(0,0,0,0.1)', padding: '1rem', borderRadius: '10px' }}>
+                      <div style={{ display: 'flex', gap: '0.5rem' }}>
+                        <input
+                          id="new-keyword"
+                          type="text"
+                          list="window-titles-list"
+                          placeholder="キーワード (例: Google Calendar)"
+                          style={{ flex: 1, padding: '0.75rem', borderRadius: '8px', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', color: '#fff' }}
+                        />
+                        <datalist id="window-titles-list">
+                          {(Array.isArray(windowTitles) ? windowTitles : []).map((title, i) => (
+                            <option key={i} value={title} />
+                          ))}
+                        </datalist>
+                        <select
+                          value={newMatchType}
+                          onChange={(e) => setNewMatchType(e.target.value)}
+                          style={{ padding: '0.75rem', borderRadius: '8px', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', color: '#fff' }}
+                        >
+                          <option value="contains" style={{ color: '#000' }}>を含む</option>
+                          <option value="starts_with" style={{ color: '#000' }}>で始まる</option>
+                          <option value="exact" style={{ color: '#000' }}>完全一致</option>
+                        </select>
+                        <span style={{ display: 'flex', alignItems: 'center', padding: '0 0.5rem' }}>→</span>
+                        <input
+                          id="new-alias"
+                          type="text"
+                          placeholder="別名 (例: 会議)"
+                          style={{ flex: 1, padding: '0.75rem', borderRadius: '8px', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', color: '#fff' }}
+                        />
+                      </div>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer', fontSize: '0.85rem', color: '#94a3b8' }}>
+                          <input type="checkbox" checked={newCaseSensitive} onChange={(e) => setNewCaseSensitive(e.target.checked)} />
+                          大文字・小文字を区別する
+                        </label>
+                        <button
+                          onClick={() => {
+                            const k = document.getElementById('new-keyword').value;
+                            const a = document.getElementById('new-alias').value;
+                            handleAddAlias(k, a, newMatchType, newCaseSensitive);
+                            document.getElementById('new-keyword').value = '';
+                            document.getElementById('new-alias').value = '';
+                            setNewCaseSensitive(false);
+                            setNewMatchType('contains');
+                          }}
+                          style={{ padding: '0.5rem 1.5rem', borderRadius: '8px', background: 'var(--primary)', color: '#fff', border: 'none', cursor: 'pointer', fontWeight: '600' }}
+                        >
+                          追加
+                        </button>
+                      </div>
+                    </div>
+
+                    <div className="aliases-list">
+                      {(Array.isArray(aliases) ? aliases : []).map((item) => (
+                        <div key={item.id} style={{ padding: '1rem', background: 'rgba(255,255,255,0.03)', borderRadius: '10px', marginBottom: '0.5rem' }}>
+                          {editingAliasId === item.id ? (
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+                              <div style={{ display: 'flex', gap: '0.5rem' }}>
+                                <input
+                                  type="text"
+                                  value={editKeyword}
+                                  onChange={(e) => setEditKeyword(e.target.value)}
+                                  style={{ flex: 1, padding: '0.5rem', borderRadius: '6px', background: 'rgba(255,255,255,0.05)', border: '1px solid var(--primary)', color: '#fff' }}
+                                />
+                                <select
+                                  value={editMatchType}
+                                  onChange={(e) => setEditMatchType(e.target.value)}
+                                  style={{ padding: '0.5rem', borderRadius: '6px', background: 'rgba(255,255,255,0.05)', border: '1px solid var(--primary)', color: '#fff' }}
+                                >
+                                  <option value="contains" style={{ color: '#000' }}>を含む</option>
+                                  <option value="starts_with" style={{ color: '#000' }}>で始まる</option>
+                                  <option value="exact" style={{ color: '#000' }}>完全一致</option>
+                                </select>
+                                <span style={{ display: 'flex', alignItems: 'center' }}>→</span>
+                                <input
+                                  type="text"
+                                  value={editAlias}
+                                  onChange={(e) => setEditAlias(e.target.value)}
+                                  style={{ flex: 1, padding: '0.5rem', borderRadius: '6px', background: 'rgba(255,255,255,0.05)', border: '1px solid var(--primary)', color: '#fff' }}
+                                />
+                              </div>
+                              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer', fontSize: '0.85rem', color: '#94a3b8' }}>
+                                  <input type="checkbox" checked={editCaseSensitive} onChange={(e) => setEditCaseSensitive(e.target.checked)} />
+                                  大文字・小文字を区別する
+                                </label>
+                                <div style={{ display: 'flex', gap: '0.5rem' }}>
+                                  <button onClick={() => handleEditAliasSave(item.id)} style={{ padding: '0.4rem 1rem', borderRadius: '6px', background: '#10b981', color: '#fff', border: 'none', cursor: 'pointer', fontSize: '0.85rem', fontWeight: '600' }}>保存</button>
+                                  <button onClick={handleEditAliasCancel} style={{ padding: '0.4rem 1rem', borderRadius: '6px', background: '#475569', color: '#fff', border: 'none', cursor: 'pointer', fontSize: '0.85rem' }}>キャンセル</button>
+                                </div>
+                              </div>
+                            </div>
+                          ) : (
+                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
+                                <div style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
+                                  <span style={{ fontSize: '0.9rem', color: '#94a3b8' }}>条件: <span style={{ color: '#fff', fontWeight: '500' }}>{item.keyword}</span> <span style={{ fontSize: '0.75rem', background: 'rgba(255,255,255,0.1)', padding: '2px 6px', borderRadius: '4px' }}>{item.match_type === 'starts_with' ? 'で始まる' : item.match_type === 'exact' ? '完全一致' : 'を含む'}</span></span>
+                                  <span style={{ fontSize: '0.9rem', color: '#94a3b8' }}>→</span>
+                                  <span style={{ fontSize: '0.9rem', color: '#94a3b8' }}>別名: <span style={{ color: 'var(--primary)', fontWeight: '600' }}>{item.alias}</span></span>
+                                </div>
+                                <div style={{ fontSize: '0.75rem', color: '#64748b' }}>
+                                  {item.case_sensitive ? '大文字・小文字を区別する' : '大文字・小文字を区別しない'}
+                                </div>
+                              </div>
+                              <div style={{ display: 'flex', gap: '0.5rem' }}>
+                                <button
+                                  onClick={() => handleEditAliasStart(item)}
+                                  style={{ background: 'transparent', border: 'none', color: '#6366f1', cursor: 'pointer', padding: '4px', fontSize: '0.85rem' }}
+                                >
+                                  編集
+                                </button>
+                                <button
+                                  onClick={() => handleDeleteAlias(item.id)}
+                                  style={{ background: 'transparent', border: 'none', color: '#64748b', cursor: 'pointer', padding: '4px' }}
+                                >
+                                  <Trash2 size={16} />
+                                </button>
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      ))}
+                      {aliases.length === 0 && <div style={{ textAlign: 'center', padding: '1rem', color: '#64748b', fontSize: '0.9rem' }}>設定されたエイリアスはありません</div>}
+                    </div>
                   </div>
 
                   <div style={{ marginBottom: '2rem', padding: '1.5rem', background: 'rgba(239, 68, 68, 0.05)', border: '1px solid rgba(239, 68, 68, 0.1)', borderRadius: '16px' }}>
