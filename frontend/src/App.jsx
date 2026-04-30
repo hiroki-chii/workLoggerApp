@@ -157,9 +157,14 @@ function App() {
     const samplingInterval = parseInt(settings.sampling_interval || 30);
     const idleThreshold = parseInt(settings.idle_threshold || 300);
 
-    // バリデーション: アイドリング判定しきい値はサンプリング間隔以上である必要がある
-    if (key === 'idle_threshold' && parseInt(value) < samplingInterval) {
-      finalValue = samplingInterval.toString();
+    // バリデーション: アイドリング判定しきい値はサンプリング間隔以上である必要がある。また、上限を600秒に制限。
+    if (key === 'idle_threshold') {
+      const val = parseInt(value);
+      if (val < samplingInterval) {
+        finalValue = samplingInterval.toString();
+      } else if (val > 600) {
+        finalValue = '600';
+      }
     }
     if (key === 'sampling_interval' && parseInt(value) > idleThreshold) {
       // サンプリング間隔を上げた場合、しきい値も連動して上げる
@@ -608,7 +613,7 @@ function App() {
                         <input
                           type="range"
                           min="10"
-                          max="1800"
+                          max="600"
                           step="10"
                           value={settings.idle_threshold || 300}
                           onChange={(e) => handleSaveSetting('idle_threshold', e.target.value)}
