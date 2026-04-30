@@ -80,7 +80,7 @@ $result = @{
     appName = $appName
     windowTitle = $title
     idleSeconds = $idleSeconds
-    timestamp = (Get-Date -Format "yyyy-MM-dd HH:mm:ss")
+    timestamp = (Get-Date).ToUniversalTime().ToString("yyyy-MM-dd HH:mm:ss")
 }
 
 $result | ConvertTo-Json

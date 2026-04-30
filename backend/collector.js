@@ -16,15 +16,19 @@ function getDb() {
   return db;
 }
 
-function getInterval() {
+function getSettings() {
   try {
     const _db = getDb();
-    const setting = _db.prepare('SELECT value FROM settings WHERE key = ?').get('sampling_interval');
-    const val = setting ? parseInt(setting.value) : 30; // Default 30s
-    return val * 1000;
+    const rows = _db.prepare('SELECT key, value FROM settings').all();
+    const settings = {};
+    rows.forEach(r => { settings[r.key] = r.value; });
+    return {
+      interval: parseInt(settings.sampling_interval || 30) * 1000,
+      recordIdle: settings.record_idle === 'true',
+      idleThreshold: parseInt(settings.idle_threshold || 300)
+    };
   } catch (err) {
-    console.log('[Collector] Settings read failed, defaulting to 30s');
-    return 30000;
+    return { interval: 30000, recordIdle: false, idleThreshold: 300 };
   }
 }
 
@@ -46,22 +50,38 @@ async function collect() {
     if (code === 0) {
       try {
         const result = JSON.parse(output);
-        if (result.appName && result.appName !== 'None' && result.idleSeconds < IDLE_THRESHOLD_SECONDS) {
-          const _db = getDb();
+        const settings = getSettings();
+        const _db = getDb();
+        
+        let shouldLog = false;
+        let logApp = result.appName;
+        let logWindow = result.windowTitle;
+
+        if (result.idleSeconds >= settings.idleThreshold) {
+          if (settings.recordIdle) {
+            shouldLog = true;
+            logApp = '無操作';
+            logWindow = '無操作';
+          }
+        } else if (result.appName && result.appName !== 'None') {
+          shouldLog = true;
+        }
+
+        if (shouldLog) {
           _db.prepare(
             'INSERT INTO logs (appName, windowTitle, timestamp) VALUES (?, ?, ?)'
-          ).run(result.appName, result.windowTitle, result.timestamp);
+          ).run(logApp, logWindow, result.timestamp);
           
           console.log('[%s] Logged: %s (%s)', 
             result.timestamp, 
-            result.appName, 
-            result.windowTitle.substring(0, 30) + (result.windowTitle.length > 30 ? '...' : '')
+            logApp, 
+            logWindow.substring(0, 30) + (logWindow.length > 30 ? '...' : '')
           );
         } else {
-          console.log('[%s] Skipped: %s (idle=%ds)', 
-            result.timestamp || new Date().toISOString().replace('T', ' ').slice(0, 19), 
-            result.appName || 'None', 
-            result.idleSeconds || 0);
+          console.log('[%s] Skipped (idle=%ds)', 
+            result.timestamp || new Date().toISOString(),
+            result.idleSeconds || 0
+          );
         }
       } catch (err) {
         console.log('[Collector] Error processing batch:', err.message);
@@ -71,9 +91,9 @@ async function collect() {
     }
 
     // Schedule next run
-    const nextInterval = getInterval();
-    console.log('[Collector] Next sample in %ds', nextInterval / 1000);
-    setTimeout(collect, nextInterval);
+    const settings = getSettings();
+    console.log('[Collector] Next sample in %ds', settings.interval / 1000);
+    setTimeout(collect, settings.interval);
   });
 }
 

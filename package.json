@@ -4,6 +4,7 @@
   "description": "",
   "main": "electron-core/main.js",
   "scripts": {
+    "dev": "concurrently \"npm run dev:frontend\" \"wait-on http://localhost:5173 && npm run dev:electron\"",
     "dev:frontend": "cd frontend && npm run dev",
     "dev:electron": "npx electron electron-core/main.js",
     "build:frontend": "npm run build --prefix frontend",

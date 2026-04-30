@@ -36,7 +36,23 @@ function startApp() {
       : `file://${path.join(PROJECT_ROOT, 'frontend/dist/index.html')}`;
 
     mainWindow.loadURL(startUrl);
-    mainWindow.once('ready-to-show', () => mainWindow.show());
+    mainWindow.once('ready-to-show', () => {
+      mainWindow.show();
+      
+      // 起動時の記録開始確認
+      const choice = dialog.showMessageBoxSync(mainWindow, {
+        type: 'question',
+        buttons: ['はい', 'いいえ'],
+        title: '記録の開始確認',
+        message: 'アプリケーションを起動しました。アクティビティの記録を開始しますか？',
+        defaultId: 0,
+        cancelId: 1
+      });
+
+      if (choice === 0) {
+        startCollector();
+      }
+    });
 
     // ウィンドウを閉じようとした時の処理
     mainWindow.on('close', (event) => {
