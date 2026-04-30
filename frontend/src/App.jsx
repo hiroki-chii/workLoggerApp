@@ -63,9 +63,9 @@ function App() {
   const [isSaving, setIsSaving] = useState(false);
   const [isRecording, setIsRecording] = useState(false);
   const { theme, setTheme, resolvedTheme } = useTheme();
-
-  // 期間選択用のステート (デフォルトは今日)
   const today = new Date().toISOString().split('T')[0];
+  const [isExportModalOpen, setIsExportModalOpen] = useState(false);
+  const [exportRange, setExportRange] = useState({ start: today, end: today });
   const [dateRange, setDateRange] = useState({ start: today, end: today });
   const [viewMode, setViewMode] = useState('pie'); // 'pie', 'list'
   const [groupBy, setGroupBy] = useState('appName'); // 'appName', 'windowTitle'
@@ -249,6 +249,22 @@ function App() {
     }
   };
 
+  const handleExportCsv = (mode) => {
+    let url = `${API_BASE}/export`;
+    if (mode === 'range') {
+      url += `?startDate=${exportRange.start}&endDate=${exportRange.end}`;
+    }
+    
+    // Create a temporary link to trigger download
+    const link = document.createElement('a');
+    link.href = url;
+    link.setAttribute('download', 'work_logs.csv');
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    setIsExportModalOpen(false);
+  };
+
   const handleAddAlias = async (keyword, alias, color, matchType, caseSensitive) => {
     if (!keyword || !alias) return;
 
@@ -420,12 +436,6 @@ function App() {
           </div>
         </div>
       </div>
-      <div style={{ display: 'flex', gap: '0.5rem' }}>
-        <a href={`${API_BASE}/export?startDate=${dateRange.start}&endDate=${dateRange.end}`} className="export-btn" download>
-          <Download size={18} />
-          CSV
-        </a>
-      </div>
     </header>
   );
 
@@ -457,11 +467,11 @@ function App() {
 
               <section className="stats-grid fade-in" style={{ animationDelay: '0.1s' }}>
                 <div className="card">
-                  <div className="card-title" style={{ display: 'flex', justifyContent: 'space-between' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                  <div className="card-title" style={{ display: 'flex', justifyContent: 'space-between', flexWrap: 'wrap', gap: '1rem', height: 'auto', minHeight: '1.5rem' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', whiteSpace: 'nowrap' }}>
                       <PieChart size={20} /> {groupBy === 'appName' ? 'アプリ使用分布' : 'ウィンドウ使用分布'}
                     </div>
-                    <div style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
+                    <div style={{ display: 'flex', gap: '1rem', alignItems: 'center', flexWrap: 'nowrap' }}>
                       <div className="toggle-group">
                         <button className={groupBy === 'appName' ? 'active' : ''} onClick={() => setGroupBy('appName')}>アプリ</button>
                         <button className={groupBy === 'windowTitle' ? 'active' : ''} onClick={() => setGroupBy('windowTitle')}>ウィンドウ</button>
@@ -607,9 +617,6 @@ function App() {
                   <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                     <History size={20} /> 最近のアクティビティ履歴
                   </div>
-                  <a href={`${API_BASE}/export`} className="export-btn" style={{ padding: '0.5rem 1rem', fontSize: '0.8rem' }} download>
-                    <Download size={14} /> CSV出力
-                  </a>
                 </div>
                 <div className="logs-table-container">
                   <table className="logs-table">
@@ -979,7 +986,7 @@ function App() {
 
                     <h3>4. データの書き出し</h3>
                     <p>
-                      ヘッダーの「CSV」ボタンから、指定した期間のログデータをCSV形式でダウンロードできます。
+                      サイドバーの「CSV出力」ボタンから、指定した期間のログデータをCSV形式でダウンロードできます。
                     </p>
                   </div>
                 </section>
@@ -1115,6 +1122,17 @@ function App() {
                 <HelpCircle size={20} />
                 <span>ヘルプ</span>
               </div>
+              <div
+                className="nav-item export-nav-item"
+                onClick={() => {
+                  setExportRange({ start: dateRange.start, end: dateRange.end });
+                  setIsExportModalOpen(true);
+                }}
+                title="CSV出力"
+              >
+                <Download size={20} />
+                <span>CSV出力</span>
+              </div>
             </nav>
             <div className="sidebar-footer">
               <div className={`theme-switcher ${isSidebarCollapsed ? 'vertical' : ''}`}>
@@ -1169,6 +1187,58 @@ function App() {
       <main className="main-content">
         {renderContent()}
       </main>
+
+      {isExportModalOpen && (
+        <div className="modal-overlay" onClick={() => setIsExportModalOpen(false)}>
+          <div className="modal-content" onClick={e => e.stopPropagation()}>
+            <div className="modal-header">
+              <h3><Download size={20} /> CSV出力設定</h3>
+              <button className="close-btn" onClick={() => setIsExportModalOpen(false)}>&times;</button>
+            </div>
+            <div className="modal-body">
+              <p style={{ fontSize: '0.9rem', color: 'var(--text-muted)', marginBottom: '1.5rem' }}>
+                出力するデータの期間を選択してください。
+              </p>
+              
+              <div className="export-option-card">
+                <div style={{ flex: 1 }}>
+                  <div style={{ fontWeight: '600', marginBottom: '0.5rem' }}>期間を指定して出力</div>
+                  <div className="modal-date-picker">
+                    <input 
+                      type="date" 
+                      value={exportRange.start} 
+                      onChange={e => setExportRange(prev => ({ ...prev, start: e.target.value }))}
+                    />
+                    <span>～</span>
+                    <input 
+                      type="date" 
+                      value={exportRange.end} 
+                      onChange={e => setExportRange(prev => ({ ...prev, end: e.target.value }))}
+                    />
+                  </div>
+                </div>
+                <button 
+                  className="primary-btn mini" 
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleExportCsv('range');
+                  }}
+                >
+                  <Download size={14} /> 出力
+                </button>
+              </div>
+
+              <div className="export-option-card" onClick={() => handleExportCsv('all')}>
+                <div style={{ flex: 1 }}>
+                  <div style={{ fontWeight: '600', marginBottom: '0.25rem' }}>すべてのデータを出力</div>
+                  <div style={{ fontSize: '0.8rem', color: '#94a3b8' }}>全期間の記録を1つのCSVファイルとして保存します</div>
+                </div>
+                <button className="primary-btn mini secondary"><Download size={14} /> 出力</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
