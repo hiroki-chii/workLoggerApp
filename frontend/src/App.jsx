@@ -1,11 +1,11 @@
-import React, { useState, useEffect } from 'react';
-import { 
-  LayoutDashboard, 
-  History, 
-  Settings, 
-  Download, 
-  Activity, 
-  Clock, 
+import React, { useState, useEffect, useRef } from 'react';
+import {
+  LayoutDashboard,
+  History,
+  Settings,
+  Download,
+  Activity,
+  Clock,
   Calendar,
   PieChart,
   List,
@@ -24,10 +24,10 @@ import {
   ChevronRight,
   Menu
 } from 'lucide-react';
-import { 
-  Chart as ChartJS, 
-  ArcElement, 
-  Tooltip, 
+import {
+  Chart as ChartJS,
+  ArcElement,
+  Tooltip,
   Legend
 } from 'chart.js';
 import { Pie } from 'react-chartjs-2';
@@ -45,11 +45,12 @@ function App() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [activeTab, setActiveTab] = useState('dashboard');
+  const timetableContainerRef = useRef(null);
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [isRecording, setIsRecording] = useState(false);
   const { theme, setTheme, resolvedTheme } = useTheme();
-  
+
   // 期間選択用のステート (デフォルトは今日)
   const today = new Date().toISOString().split('T')[0];
   const [dateRange, setDateRange] = useState({ start: today, end: today });
@@ -69,16 +70,16 @@ function App() {
         fetch(`${API_BASE}/heatmap?${params}&groupBy=${groupBy}`),
         fetch(`${API_BASE}/settings`)
       ]);
-      
+
       if (!statsRes.ok || !logsRes.ok || !heatmapRes.ok || !settingsRes.ok) {
-         throw new Error(`Server returned error: ${statsRes.status}`);
+        throw new Error(`Server returned error: ${statsRes.status}`);
       }
 
       const statsData = await statsRes.json();
       const logsData = await logsRes.json();
       const heatmapData = await heatmapRes.json();
       const settingsData = await settingsRes.json();
-      
+
       setStats(statsData);
       setLogs(logsData);
       setHeatmapData(heatmapData);
@@ -110,11 +111,37 @@ function App() {
       const channel = isRecording ? 'recording:stop' : 'recording:start';
       const status = await ipcRenderer.invoke(channel);
       setIsRecording(status);
-      
+
       // 記録開始時はデータを即時リフレッシュ
       if (status) {
         setTimeout(fetchData, 1000);
       }
+    }
+  };
+
+  const jumpToCurrentTime = () => {
+    const now = new Date();
+    const dateStr = now.toISOString().split('T')[0];
+    const h = now.getHours();
+    const m = Math.floor(now.getMinutes() / 15) * 15;
+    const mStr = m.toString().padStart(2, '0');
+
+    const elementId = `cell-${dateStr}-${h}-${mStr}`;
+    const element = document.getElementById(elementId);
+
+    if (element) {
+      element.scrollIntoView({ behavior: 'smooth', block: 'center', inline: 'center' });
+      // 一時的にハイライト
+      element.style.outline = '3px solid var(--accent)';
+      element.style.outlineOffset = '2px';
+      element.style.zIndex = '100';
+      setTimeout(() => {
+        element.style.outline = '';
+        element.style.outlineOffset = '';
+        element.style.zIndex = '';
+      }, 3000);
+    } else {
+      alert('現在の日時が表示範囲外です。');
     }
   };
 
@@ -233,12 +260,12 @@ function App() {
                   <span className="app-percentage">{Math.round((s.count / total) * 100)}%</span>
                 </div>
                 <div className="progress-bar">
-                  <div 
-                    className="progress-fill" 
-                    style={{ 
+                  <div
+                    className="progress-fill"
+                    style={{
                       width: `${(s.count / total) * 100}%`,
                       background: `linear-gradient(90deg, var(--primary), var(--accent))`
-                    }} 
+                    }}
                   />
                 </div>
               </div>
@@ -257,9 +284,9 @@ function App() {
         <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', marginTop: '0.5rem' }}>
           <div className="date-picker-group">
             <Calendar size={14} />
-            <input 
-              type="date" 
-              value={dateRange.start} 
+            <input
+              type="date"
+              value={dateRange.start}
               max={dateRange.end}
               onChange={(e) => {
                 const newStart = e.target.value;
@@ -269,9 +296,9 @@ function App() {
               }}
             />
             <span>～</span>
-            <input 
-              type="date" 
-              value={dateRange.end} 
+            <input
+              type="date"
+              value={dateRange.end}
               min={dateRange.start}
               onChange={(e) => {
                 const newEnd = e.target.value;
@@ -301,12 +328,12 @@ function App() {
 
             <div style={{ flex: 1, overflowY: 'auto', paddingRight: '0.5rem', marginTop: '1rem' }}>
               {error && (
-                <div style={{ 
-                  margin: '1rem 0', 
-                  padding: '1rem', 
-                  background: 'rgba(239, 68, 68, 0.1)', 
-                  border: '1px solid rgba(239, 68, 68, 0.2)', 
-                  borderRadius: '12px', 
+                <div style={{
+                  margin: '1rem 0',
+                  padding: '1rem',
+                  background: 'rgba(239, 68, 68, 0.1)',
+                  border: '1px solid rgba(239, 68, 68, 0.2)',
+                  borderRadius: '12px',
                   color: '#f87171',
                   fontSize: '0.9rem',
                   display: 'flex',
@@ -339,7 +366,7 @@ function App() {
                     {renderStatsView()}
                   </div>
                 </div>
-                
+
                 <div className="card">
                   <div className="card-title">
                     <Clock size={20} /> サマリー
@@ -355,7 +382,7 @@ function App() {
                     </div>
                   </div>
                   <div style={{ marginTop: '1.5rem', padding: '1rem', borderTop: '1px solid rgba(255,255,255,0.05)' }}>
-                     <span style={{ color: '#94a3b8', fontSize: '0.85rem' }}>次のサンプリングまで 約{settings.sampling_interval}秒</span>
+                    <span style={{ color: '#94a3b8', fontSize: '0.85rem' }}>次のサンプリングまで 約{settings.sampling_interval}秒</span>
                   </div>
                 </div>
               </section>
@@ -385,10 +412,32 @@ function App() {
           <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
             {renderDateHeader('タイムテーブル分析')}
             <section className="card fade-in" style={{ flex: 1, marginTop: '1rem', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
-              <div className="card-title">
-                <LayoutGrid size={20} /> 24時間・週次アクティビティ
+              <div className="card-title" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                  <LayoutGrid size={20} /> 24時間・週次アクティビティ
+                </div>
+                <button
+                  onClick={jumpToCurrentTime}
+                  className="jump-btn"
+                  style={{
+                    padding: '0.4rem 0.8rem',
+                    fontSize: '0.75rem',
+                    borderRadius: '8px',
+                    background: 'rgba(99, 102, 241, 0.1)',
+                    border: '1px solid rgba(99, 102, 241, 0.2)',
+                    color: 'var(--primary)',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '0.4rem',
+                    fontWeight: '600',
+                    transition: 'all 0.2s'
+                  }}
+                >
+                  <Clock size={14} /> 現在時刻へ
+                </button>
               </div>
-              <div className="timetable-container" style={{ flex: 1, marginTop: '1rem' }}>
+              <div className="timetable-container" ref={timetableContainerRef} style={{ flex: 1, marginTop: '1rem' }}>
                 <div className="timetable-grid" style={{ gridTemplateColumns: `70px repeat(${dates.length}, 1fr)`, gridAutoRows: '30px' }}>
                   <div className="time-label-header sticky-header sticky-left"></div>
                   {dates.map(d => {
@@ -398,29 +447,30 @@ function App() {
                     const dd = dateObj.getDate().toString().padStart(2, '0');
                     const dayName = ['日', '月', '火', '水', '木', '金', '土'][dateObj.getDay()];
                     const dayType = dateObj.getDay() === 0 ? 'is-sunday' : dateObj.getDay() === 6 ? 'is-saturday' : '';
-                    
+
                     return (
                       <div key={d} className={`day-label sticky-header ${dayType}`}>
                         {`${yy}/${mm}/${dd}(${dayName})`}
                       </div>
                     );
                   })}
-                  
+
                   {intervals.map(({ h, m }) => (
                     <React.Fragment key={`${h}:${m}`}>
                       <div className="time-label sticky-left">{m === '00' ? `${h}:00` : `:${m}`}</div>
                       {dates.map(date => {
-                        const cell = heatmapData.find(d => 
-                          d.logDate === date && 
-                          parseInt(d.hour) === h && 
+                        const cell = heatmapData.find(d =>
+                          d.logDate === date &&
+                          parseInt(d.hour) === h &&
                           parseInt(d.minute) === parseInt(m)
                         );
                         const opacity = cell ? (cell.count / maxCount) * 0.8 + 0.1 : 0;
                         return (
-                          <div 
-                            key={date} 
-                            className={`timetable-cell ${new Date(date).getDay() === 0 ? 'is-sunday' : new Date(date).getDay() === 6 ? 'is-saturday' : ''}`} 
-                            style={{ 
+                          <div
+                            key={date}
+                            id={`cell-${date}-${h}-${m}`}
+                            className={`timetable-cell ${new Date(date).getDay() === 0 ? 'is-sunday' : new Date(date).getDay() === 6 ? 'is-saturday' : ''}`}
+                            style={{
                               backgroundColor: cell ? `rgba(99, 102, 241, ${opacity})` : undefined,
                               border: cell ? 'none' : undefined
                             }}
@@ -548,17 +598,17 @@ function App() {
                         }} />
                       </button>
                     </div>
-                    
+
                     {settings.record_idle === 'true' && (
                       <div style={{ borderTop: '1px solid rgba(255,255,255,0.05)', paddingTop: '1.5rem' }}>
                         <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
                           <span style={{ fontSize: '0.9rem', color: '#94a3b8' }}>無操作判定しきい値</span>
                           <span style={{ fontWeight: '600' }}>{settings.idle_threshold || 300}秒</span>
                         </div>
-                        <input 
-                          type="range" 
-                          min="10" 
-                          max="1800" 
+                        <input
+                          type="range"
+                          min="10"
+                          max="1800"
                           step="10"
                           value={settings.idle_threshold || 300}
                           onChange={(e) => handleSaveSetting('idle_threshold', e.target.value)}
@@ -611,7 +661,7 @@ function App() {
             </div>
           </div>
         );
-      
+
       default:
         return null;
     }
@@ -627,8 +677,8 @@ function App() {
               <span>WorkPulse</span>
             </>
           )}
-          <button 
-            className="sidebar-toggle" 
+          <button
+            className="sidebar-toggle"
             onClick={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
             title={isSidebarCollapsed ? "サイドバーを開く" : "サイドバーを閉じる"}
             style={isSidebarCollapsed ? { position: 'static', margin: '0 auto' } : {}}
@@ -636,11 +686,11 @@ function App() {
             {isSidebarCollapsed ? <ChevronRight size={18} /> : <ChevronLeft size={18} />}
           </button>
         </div>
-        
+
         {!isSidebarCollapsed && (
           <>
             <nav className="nav-links">
-              <div 
+              <div
                 className={`nav-item ${activeTab === 'dashboard' ? 'active' : ''}`}
                 onClick={() => setActiveTab('dashboard')}
                 title="ダッシュボード"
@@ -648,7 +698,7 @@ function App() {
                 <LayoutDashboard size={20} />
                 <span>ダッシュボード</span>
               </div>
-              <div 
+              <div
                 className={`nav-item ${activeTab === 'history' ? 'active' : ''}`}
                 onClick={() => setActiveTab('history')}
                 title="履歴"
@@ -656,7 +706,7 @@ function App() {
                 <History size={20} />
                 <span>履歴</span>
               </div>
-              <div 
+              <div
                 className={`nav-item ${activeTab === 'timetable' ? 'active' : ''}`}
                 onClick={() => setActiveTab('timetable')}
                 title="タイムテーブル"
@@ -664,7 +714,7 @@ function App() {
                 <LayoutGrid size={20} />
                 <span>タイムテーブル</span>
               </div>
-              <div 
+              <div
                 className={`nav-item ${activeTab === 'settings' ? 'active' : ''}`}
                 onClick={() => setActiveTab('settings')}
                 title="設定"
@@ -675,22 +725,22 @@ function App() {
             </nav>
             <div className="sidebar-footer">
               <div className={`theme-switcher ${isSidebarCollapsed ? 'vertical' : ''}`}>
-                <button 
-                  className={`theme-btn ${theme === 'light' ? 'active' : ''}`} 
+                <button
+                  className={`theme-btn ${theme === 'light' ? 'active' : ''}`}
                   onClick={() => setTheme('light')}
                   title="ライトモード"
                 >
                   <Sun size={18} />
                 </button>
-                <button 
-                  className={`theme-btn ${theme === 'dark' ? 'active' : ''}`} 
+                <button
+                  className={`theme-btn ${theme === 'dark' ? 'active' : ''}`}
                   onClick={() => setTheme('dark')}
                   title="ダークモード"
                 >
                   <Moon size={18} />
                 </button>
-                <button 
-                  className={`theme-btn ${theme === 'system' ? 'active' : ''}`} 
+                <button
+                  className={`theme-btn ${theme === 'system' ? 'active' : ''}`}
                   onClick={() => setTheme('system')}
                   title="システム設定"
                 >
@@ -700,13 +750,13 @@ function App() {
 
               <div className="agent-status-card">
                 <div className="card-title" style={{ fontSize: '0.8rem', marginBottom: '0.5rem', color: 'var(--text-muted)' }}>
-                  <Cpu size={14} /> {!isSidebarCollapsed && 'エージェントの状態'}
+                  {/* <Cpu size={14} /> {!isSidebarCollapsed && '記録状態'} */}
                 </div>
                 <div style={{ fontSize: '0.9rem', color: isRecording ? '#10b981' : '#64748b', display: 'flex', alignItems: 'center', gap: '0.5rem', justifyContent: isSidebarCollapsed ? 'center' : 'flex-start' }}>
                   <div className={`status-dot ${isRecording ? 'active' : 'inactive'}`} />
                   {!isSidebarCollapsed && (isRecording ? '記録中' : '停止中')}
                 </div>
-                <button 
+                <button
                   className={`recording-btn ${isRecording ? 'stop' : 'start'} ${isSidebarCollapsed ? 'mini' : ''}`}
                   onClick={toggleRecording}
                   title={isRecording ? "記録を停止" : "記録を開始"}
