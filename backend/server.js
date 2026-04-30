@@ -38,27 +38,23 @@ try {
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       keyword TEXT UNIQUE,
       alias TEXT,
+      color TEXT,
       match_type TEXT DEFAULT 'contains',
       case_sensitive INTEGER DEFAULT 0
     );
   `);
 
-  // Add alias column to logs table if it doesn't exist
-  try {
-    db.prepare("ALTER TABLE logs ADD COLUMN alias TEXT").run();
-    console.log('[Server] Added alias column to logs table');
-  } catch (err) {
-    // Column might already exist
-  }
-
+  // Add columns if they don't exist
+  try { db.prepare("ALTER TABLE logs ADD COLUMN alias TEXT").run(); } catch(e) {}
   try { db.prepare("ALTER TABLE keyword_aliases ADD COLUMN match_type TEXT DEFAULT 'contains'").run(); } catch(e) {}
   try { db.prepare("ALTER TABLE keyword_aliases ADD COLUMN case_sensitive INTEGER DEFAULT 0").run(); } catch(e) {}
-
+  try { db.prepare("ALTER TABLE keyword_aliases ADD COLUMN color TEXT").run(); } catch(e) {}
 
   // Default settings
   db.prepare('INSERT OR IGNORE INTO settings (key, value) VALUES (?, ?)').run('sampling_interval', '30');
   db.prepare('INSERT OR IGNORE INTO settings (key, value) VALUES (?, ?)').run('record_idle', 'true');
   db.prepare('INSERT OR IGNORE INTO settings (key, value) VALUES (?, ?)').run('idle_threshold', '300');
+  db.prepare('INSERT OR IGNORE INTO settings (key, value) VALUES (?, ?)').run('default_activity_color', '#6366f1');
   console.log('[Server] Database initialized (Better-SQLite3, WAL mode) at: %s', DB_PATH);
 } catch (err) {
   console.error('[Server] Database initialization failed:', err);
@@ -189,8 +185,8 @@ function applyAliasToPastLogs(db, keyword, alias, matchType, caseSensitive) {
 
 app.post('/api/aliases', (req, res) => {
   try {
-    const { keyword, alias, applyToPast, matchType = 'contains', caseSensitive = false } = req.body;
-    db.prepare('INSERT OR REPLACE INTO keyword_aliases (keyword, alias, match_type, case_sensitive) VALUES (?, ?, ?, ?)').run(keyword, alias, matchType, caseSensitive ? 1 : 0);
+    const { keyword, alias, color, applyToPast, matchType = 'contains', caseSensitive = false } = req.body;
+    db.prepare('INSERT OR REPLACE INTO keyword_aliases (keyword, alias, color, match_type, case_sensitive) VALUES (?, ?, ?, ?, ?)').run(keyword, alias, color, matchType, caseSensitive ? 1 : 0);
     
     let updatedCount = 0;
     if (applyToPast) {
@@ -225,8 +221,8 @@ app.delete('/api/aliases/:id', (req, res) => {
 app.put('/api/aliases/:id', (req, res) => {
   try {
     const { id } = req.params;
-    const { keyword, alias, applyToPast, matchType = 'contains', caseSensitive = false } = req.body;
-    db.prepare('UPDATE keyword_aliases SET keyword = ?, alias = ?, match_type = ?, case_sensitive = ? WHERE id = ?').run(keyword, alias, matchType, caseSensitive ? 1 : 0, id);
+    const { keyword, alias, color, applyToPast, matchType = 'contains', caseSensitive = false } = req.body;
+    db.prepare('UPDATE keyword_aliases SET keyword = ?, alias = ?, color = ?, match_type = ?, case_sensitive = ? WHERE id = ?').run(keyword, alias, color, matchType, caseSensitive ? 1 : 0, id);
 
     let updatedCount = 0;
     if (applyToPast) {
@@ -301,14 +297,15 @@ app.get('/api/heatmap', (req, res) => {
       ),
       RankedBuckets AS (
         SELECT 
-          logDate, hour, minute, appName, groupWindow, alias, origTitle, taskCount,
-          SUM(taskCount) OVER(PARTITION BY logDate, hour, minute) as totalCount,
-          ROW_NUMBER() OVER(PARTITION BY logDate, hour, minute ORDER BY taskCount DESC) as rank
-        FROM BucketCounts
+          b.logDate, b.hour, b.minute, b.appName, b.groupWindow, b.alias, b.origTitle, b.taskCount,
+          SUM(b.taskCount) OVER(PARTITION BY b.logDate, b.hour, b.minute) as totalCount,
+          ROW_NUMBER() OVER(PARTITION BY b.logDate, b.hour, b.minute ORDER BY b.taskCount DESC) as rank,
+          (SELECT color FROM keyword_aliases WHERE alias = b.alias LIMIT 1) as color
+        FROM BucketCounts b
       )
       SELECT logDate, hour, minute, appName as topApp, 
              CASE WHEN alias IS NOT NULL THEN alias || ' (' || origTitle || ')' ELSE groupWindow END as topWindow, 
-             taskCount, totalCount as count
+             taskCount, totalCount as count, color
       FROM RankedBuckets
       WHERE rank = 1
     `;

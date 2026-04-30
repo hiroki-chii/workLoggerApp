@@ -46,8 +46,10 @@ function App() {
   const [editingAliasId, setEditingAliasId] = useState(null);
   const [editKeyword, setEditKeyword] = useState('');
   const [editAlias, setEditAlias] = useState('');
+  const [editColor, setEditColor] = useState('#6366f1');
   const [editMatchType, setEditMatchType] = useState('contains');
   const [editCaseSensitive, setEditCaseSensitive] = useState(false);
+  const [newColor, setNewColor] = useState('#6366f1');
   const [newMatchType, setNewMatchType] = useState('contains');
   const [newCaseSensitive, setNewCaseSensitive] = useState(false);
   const [windowTitles, setWindowTitles] = useState([]);
@@ -218,7 +220,7 @@ function App() {
     }
   };
 
-  const handleAddAlias = async (keyword, alias, matchType, caseSensitive) => {
+  const handleAddAlias = async (keyword, alias, color, matchType, caseSensitive) => {
     if (!keyword || !alias) return;
     
     const applyToPast = window.confirm('過去のログにもこのエイリアスを反映しますか？');
@@ -227,7 +229,7 @@ function App() {
       await fetch(`${API_BASE}/aliases`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ keyword, alias, applyToPast, matchType, caseSensitive })
+        body: JSON.stringify({ keyword, alias, color, applyToPast, matchType, caseSensitive })
       });
       fetchData();
     } catch (err) {
@@ -248,6 +250,7 @@ function App() {
     setEditingAliasId(item.id);
     setEditKeyword(item.keyword);
     setEditAlias(item.alias);
+    setEditColor(item.color || '#6366f1');
     setEditMatchType(item.match_type || 'contains');
     setEditCaseSensitive(!!item.case_sensitive);
   };
@@ -267,7 +270,7 @@ function App() {
       await fetch(`${API_BASE}/aliases/${id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ keyword: editKeyword, alias: editAlias, applyToPast, matchType: editMatchType, caseSensitive: editCaseSensitive })
+        body: JSON.stringify({ keyword: editKeyword, alias: editAlias, color: editColor, applyToPast, matchType: editMatchType, caseSensitive: editCaseSensitive })
       });
       setEditingAliasId(null);
       fetchData();
@@ -542,19 +545,21 @@ function App() {
                           parseInt(d.hour) === h &&
                           parseInt(d.minute) === parseInt(m)
                         );
-                        const opacity = cell ? (cell.count / maxCount) * 0.8 + 0.1 : 0;
-                        return (
-                          <div
-                            key={date}
-                            id={`cell-${date}-${h}-${m}`}
-                            className={`timetable-cell ${new Date(date).getDay() === 0 ? 'is-sunday' : new Date(date).getDay() === 6 ? 'is-saturday' : ''}`}
-                            style={{
-                              backgroundColor: cell ? `rgba(99, 102, 241, ${opacity})` : undefined,
-                              border: cell ? 'none' : undefined
-                            }}
-                            title={`${date} ${h}:${m}\nアプリ: ${cell ? cell.topApp : 'なし'}\nウィンドウ: ${cell ? cell.topWindow : 'なし'}\n占有率: ${cell ? Math.round((cell.taskCount / cell.count) * 100) : 0}% (${cell ? cell.count : 0} samples)`}
-                          />
-                        );
+                          const opacity = cell ? (cell.count / maxCount) * 0.8 + 0.1 : 0;
+                          const cellColor = cell?.color || settings.default_activity_color || 'var(--primary)';
+                          return (
+                            <div
+                              key={date}
+                              id={`cell-${date}-${h}-${m}`}
+                              className={`timetable-cell ${new Date(date).getDay() === 0 ? 'is-sunday' : new Date(date).getDay() === 6 ? 'is-saturday' : ''}`}
+                              style={{
+                                backgroundColor: cell ? cellColor : undefined,
+                                opacity: cell ? opacity : undefined,
+                                border: cell ? 'none' : undefined
+                              }}
+                              title={`${date} ${h}:${m}\nアプリ: ${cell ? cell.topApp : 'なし'}\nウィンドウ: ${cell ? cell.topWindow : 'なし'}\n占有率: ${cell ? Math.round((cell.taskCount / cell.count) * 100) : 0}% (${cell ? cell.count : 0} samples)`}
+                            />
+                          );
                       })}
                     </React.Fragment>
                   ))}
@@ -595,7 +600,7 @@ function App() {
                           <td style={{ maxWidth: '400px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                             {log.alias ? (
                               <>
-                                <span style={{ color: 'var(--primary)', fontWeight: '600', marginRight: '8px' }}>{log.alias}</span>
+                                <span style={{ color: aliases.find(a => a.alias === log.alias)?.color || settings.default_activity_color || 'var(--primary)', fontWeight: '600', marginRight: '8px' }}>{log.alias}</span>
                                 <span style={{ color: '#94a3b8', fontSize: '0.85em' }} title={log.windowTitle}>({log.windowTitle})</span>
                               </>
                             ) : (
@@ -623,31 +628,50 @@ function App() {
                 </div>
                 <div style={{ padding: '1.5rem' }}>
                   <div style={{ marginBottom: '2rem', padding: '1.5rem', background: 'rgba(255,255,255,0.02)', borderRadius: '16px' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '1rem' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '1.5rem' }}>
                       <Timer size={20} color="#6366f1" />
-                      <span style={{ fontWeight: '600' }}>サンプリング間隔</span>
+                      <span style={{ fontWeight: '600' }}>基本設定</span>
                     </div>
-                    <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
-                      {[10, 20, 30, 40, 50, 60].map((interval) => (
-                        <button
-                          key={interval}
-                          onClick={() => handleSaveSetting('sampling_interval', interval)}
-                          disabled={isSaving}
-                          style={{
-                            padding: '0.75rem 1.25rem',
-                            borderRadius: '10px',
-                            border: '1px solid',
-                            borderColor: settings.sampling_interval === interval.toString() ? '#6366f1' : 'rgba(255,255,255,0.1)',
-                            background: settings.sampling_interval === interval.toString() ? 'rgba(99, 102, 241, 0.2)' : 'transparent',
-                            color: settings.sampling_interval === interval.toString() ? '#fff' : '#94a3b8',
-                            cursor: 'pointer',
-                            transition: 'all 0.2s',
-                            fontWeight: '500'
-                          }}
-                        >
-                          {interval}秒
-                        </button>
-                      ))}
+                    
+                    <div style={{ marginBottom: '1.5rem', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                      <div>
+                        <div style={{ fontSize: '0.9rem', fontWeight: '500' }}>サンプリング間隔</div>
+                        <div style={{ fontSize: '0.8rem', color: '#94a3b8' }}>データの収集頻度を設定します</div>
+                      </div>
+                      <div style={{ display: 'flex', gap: '0.5rem' }}>
+                        {[10, 30, 60].map((interval) => (
+                          <button
+                            key={interval}
+                            onClick={() => handleSaveSetting('sampling_interval', interval)}
+                            style={{
+                              padding: '0.4rem 0.8rem',
+                              borderRadius: '8px',
+                              border: '1px solid',
+                              borderColor: settings.sampling_interval === interval.toString() ? '#6366f1' : 'rgba(255,255,255,0.1)',
+                              background: settings.sampling_interval === interval.toString() ? 'rgba(99, 102, 241, 0.2)' : 'transparent',
+                              color: settings.sampling_interval === interval.toString() ? '#fff' : '#94a3b8',
+                              cursor: 'pointer',
+                              fontSize: '0.8rem',
+                              transition: 'all 0.2s'
+                            }}
+                          >
+                            {interval}s
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                      <div>
+                        <div style={{ fontSize: '0.9rem', fontWeight: '500' }}>デフォルトカラー</div>
+                        <div style={{ fontSize: '0.8rem', color: '#94a3b8' }}>エイリアス未設定時の表示色</div>
+                      </div>
+                      <input
+                        type="color"
+                        value={settings.default_activity_color || '#6366f1'}
+                        onChange={(e) => handleSaveSetting('default_activity_color', e.target.value)}
+                        style={{ width: '40px', height: '40px', padding: '0', border: 'none', background: 'transparent', cursor: 'pointer' }}
+                      />
                     </div>
                   </div>
 
@@ -718,13 +742,13 @@ function App() {
                     </div>
                     
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem', marginBottom: '1.5rem', background: 'rgba(0,0,0,0.1)', padding: '1rem', borderRadius: '10px' }}>
-                      <div style={{ display: 'flex', gap: '0.5rem' }}>
+                      <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', alignItems: 'center' }}>
                         <input
                           id="new-keyword"
                           type="text"
                           list="window-titles-list"
                           placeholder="キーワード (例: Google Calendar)"
-                          style={{ flex: 1, padding: '0.75rem', borderRadius: '8px', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', color: '#fff' }}
+                          style={{ flex: '1 1 200px', padding: '0.75rem', borderRadius: '8px', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', color: '#fff', minWidth: '150px' }}
                         />
                         <datalist id="window-titles-list">
                           {(Array.isArray(windowTitles) ? windowTitles : []).map((title, i) => (
@@ -745,7 +769,14 @@ function App() {
                           id="new-alias"
                           type="text"
                           placeholder="別名 (例: 会議)"
-                          style={{ flex: 1, padding: '0.75rem', borderRadius: '8px', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', color: '#fff' }}
+                          style={{ flex: '1 1 150px', padding: '0.75rem', borderRadius: '8px', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', color: '#fff', minWidth: '100px' }}
+                        />
+                        <input
+                          type="color"
+                          value={newColor}
+                          onChange={(e) => setNewColor(e.target.value)}
+                          style={{ width: '40px', height: '40px', padding: '0', border: 'none', background: 'transparent', cursor: 'pointer', flexShrink: 0 }}
+                          title="表示色を選択"
                         />
                       </div>
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -753,18 +784,19 @@ function App() {
                           <input type="checkbox" checked={newCaseSensitive} onChange={(e) => setNewCaseSensitive(e.target.checked)} />
                           大文字・小文字を区別する
                         </label>
-                        <button
-                          onClick={() => {
-                            const k = document.getElementById('new-keyword').value;
-                            const a = document.getElementById('new-alias').value;
-                            handleAddAlias(k, a, newMatchType, newCaseSensitive);
-                            document.getElementById('new-keyword').value = '';
-                            document.getElementById('new-alias').value = '';
-                            setNewCaseSensitive(false);
-                            setNewMatchType('contains');
-                          }}
-                          style={{ padding: '0.5rem 1.5rem', borderRadius: '8px', background: 'var(--primary)', color: '#fff', border: 'none', cursor: 'pointer', fontWeight: '600' }}
-                        >
+                          <button
+                            onClick={() => {
+                              const k = document.getElementById('new-keyword').value;
+                              const a = document.getElementById('new-alias').value;
+                              handleAddAlias(k, a, newColor, newMatchType, newCaseSensitive);
+                              document.getElementById('new-keyword').value = '';
+                              document.getElementById('new-alias').value = '';
+                              setNewCaseSensitive(false);
+                              setNewMatchType('contains');
+                              setNewColor('#6366f1');
+                            }}
+                            style={{ padding: '0.5rem 1.5rem', borderRadius: '8px', background: 'var(--primary)', color: '#fff', border: 'none', cursor: 'pointer', fontWeight: '600' }}
+                          >
                           追加
                         </button>
                       </div>
@@ -773,14 +805,10 @@ function App() {
                     <div className="aliases-list">
                       {(Array.isArray(aliases) ? aliases : []).map((item) => (
                         <div key={item.id} style={{ padding: '1rem', background: 'rgba(255,255,255,0.03)', borderRadius: '10px', marginBottom: '0.5rem' }}>
-                          {editingAliasId === item.id ? (
-                            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-                              <div style={{ display: 'flex', gap: '0.5rem' }}>
+                          {editingAliasId === item.id ? ( <div style={{ display: "flex", flexDirection: "column", gap: "0.75rem" }}> <div style={{ display: "flex", gap: "0.5rem", flexWrap: "wrap", alignItems: "center" }}>
                                 <input
                                   type="text"
-                                  value={editKeyword}
-                                  onChange={(e) => setEditKeyword(e.target.value)}
-                                  style={{ flex: 1, padding: '0.5rem', borderRadius: '6px', background: 'rgba(255,255,255,0.05)', border: '1px solid var(--primary)', color: '#fff' }}
+                                  value={editKeyword} onChange={(e) => setEditKeyword(e.target.value)} style={{ flex: "1 1 150px", minWidth: "120px", padding: '0.5rem', borderRadius: '6px', background: 'rgba(255,255,255,0.05)', border: '1px solid var(--primary)', color: '#fff' }}
                                 />
                                 <select
                                   value={editMatchType}
@@ -794,9 +822,10 @@ function App() {
                                 <span style={{ display: 'flex', alignItems: 'center' }}>→</span>
                                 <input
                                   type="text"
-                                  value={editAlias}
-                                  onChange={(e) => setEditAlias(e.target.value)}
-                                  style={{ flex: 1, padding: '0.5rem', borderRadius: '6px', background: 'rgba(255,255,255,0.05)', border: '1px solid var(--primary)', color: '#fff' }}
+                                  value={editAlias} onChange={(e) => setEditAlias(e.target.value)} style={{ flex: "1 1 120px", minWidth: "100px", padding: '0.5rem', borderRadius: '6px', background: 'rgba(255,255,255,0.05)', border: '1px solid var(--primary)', color: '#fff' }}
+                                />
+                                <input
+                                  type="color" value={editColor} onChange={(e) => setEditColor(e.target.value)} style={{ width: "34px", height: "34px", padding: "0", border: "none", background: "transparent", cursor: "pointer", flexShrink: 0 }}
                                 />
                               </div>
                               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -804,7 +833,7 @@ function App() {
                                   <input type="checkbox" checked={editCaseSensitive} onChange={(e) => setEditCaseSensitive(e.target.checked)} />
                                   大文字・小文字を区別する
                                 </label>
-                                <div style={{ display: 'flex', gap: '0.5rem' }}>
+                                <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', alignItems: 'center' }}>
                                   <button onClick={() => handleEditAliasSave(item.id)} style={{ padding: '0.4rem 1rem', borderRadius: '6px', background: '#10b981', color: '#fff', border: 'none', cursor: 'pointer', fontSize: '0.85rem', fontWeight: '600' }}>保存</button>
                                   <button onClick={handleEditAliasCancel} style={{ padding: '0.4rem 1rem', borderRadius: '6px', background: '#475569', color: '#fff', border: 'none', cursor: 'pointer', fontSize: '0.85rem' }}>キャンセル</button>
                                 </div>
@@ -816,7 +845,10 @@ function App() {
                                 <div style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
                                   <span style={{ fontSize: '0.9rem', color: '#94a3b8' }}>条件: <span style={{ color: '#fff', fontWeight: '500' }}>{item.keyword}</span> <span style={{ fontSize: '0.75rem', background: 'rgba(255,255,255,0.1)', padding: '2px 6px', borderRadius: '4px' }}>{item.match_type === 'starts_with' ? 'で始まる' : item.match_type === 'exact' ? '完全一致' : 'を含む'}</span></span>
                                   <span style={{ fontSize: '0.9rem', color: '#94a3b8' }}>→</span>
-                                  <span style={{ fontSize: '0.9rem', color: '#94a3b8' }}>別名: <span style={{ color: 'var(--primary)', fontWeight: '600' }}>{item.alias}</span></span>
+                                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                                    <div style={{ width: '12px', height: '12px', borderRadius: '50%', backgroundColor: item.color || 'var(--primary)' }} />
+                                    <span style={{ fontSize: '0.9rem', color: '#94a3b8' }}>別名: <span style={{ color: item.color || 'var(--primary)', fontWeight: '600' }}>{item.alias}</span></span>
+                                  </div>
                                 </div>
                                 <div style={{ fontSize: '0.75rem', color: '#64748b' }}>
                                   {item.case_sensitive ? '大文字・小文字を区別する' : '大文字・小文字を区別しない'}
