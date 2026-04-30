@@ -366,7 +366,7 @@ function App() {
                 <div className="top-app-info">
                   <span className="app-rank">{i + 1}</span>
                   <span className="app-name">{s.name || s.appName}</span>
-                  <span className="app-percentage">{Math.round((s.count / total) * 100)}%</span>
+                  <span className="app-percentage">{Math.round((s.count / total) * 100)}% ({Math.round((s.count * parseInt(settings.sampling_interval || 30)) / 60)}分)</span>
                 </div>
                 <div className="progress-bar">
                   <div
