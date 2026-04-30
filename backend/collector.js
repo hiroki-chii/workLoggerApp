@@ -61,8 +61,8 @@ async function collect() {
         if (result.idleSeconds >= settings.idleThreshold) {
           if (settings.recordIdle) {
             shouldLog = true;
-            logApp = '無操作';
-            logWindow = '無操作';
+            logApp = 'アイドル状態';
+            logWindow = 'アイドル状態';
           }
         } else if (result.appName && result.appName !== 'None') {
           shouldLog = true;

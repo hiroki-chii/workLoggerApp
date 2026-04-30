@@ -201,7 +201,15 @@ app.post('/api/aliases', (req, res) => {
 
 app.get('/api/window-titles', (req, res) => {
   try {
-    const titles = db.prepare("SELECT windowTitle FROM logs WHERE windowTitle IS NOT NULL GROUP BY windowTitle ORDER BY MAX(timestamp) DESC LIMIT 500").all();
+    const titles = db.prepare(`
+      SELECT windowTitle 
+      FROM logs 
+      WHERE windowTitle IS NOT NULL 
+        AND windowTitle NOT IN ('アイドル状態', '無操作')
+      GROUP BY windowTitle 
+      ORDER BY MAX(timestamp) DESC 
+      LIMIT 500
+    `).all();
     res.json(titles.map(t => t.windowTitle));
   } catch (err) {
     res.status(500).json({ error: err.message });

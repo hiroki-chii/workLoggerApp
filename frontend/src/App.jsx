@@ -22,7 +22,8 @@ import {
   AlertTriangle,
   ChevronLeft,
   ChevronRight,
-  Menu
+  Menu,
+  HelpCircle
 } from 'lucide-react';
 import {
   Chart as ChartJS,
@@ -167,7 +168,7 @@ function App() {
     // データ取得が完了し、まだ確認ダイアログを表示していない場合、かつ記録中でない場合に表示
     if (!loading && !hasPrompted.current && !isRecording) {
       hasPrompted.current = true;
-      
+
       const confirmStartup = async () => {
         if (window.require) {
           try {
@@ -183,7 +184,7 @@ function App() {
           }
         }
       };
-      
+
       // レンダリングが確実に完了するように少しだけ遅延させる
       const timer = setTimeout(confirmStartup, 500);
       return () => clearTimeout(timer);
@@ -250,9 +251,9 @@ function App() {
 
   const handleAddAlias = async (keyword, alias, color, matchType, caseSensitive) => {
     if (!keyword || !alias) return;
-    
+
     const applyToPast = window.confirm('過去のログにもこのエイリアスを反映しますか？');
-    
+
     try {
       await fetch(`${API_BASE}/aliases`, {
         method: 'POST',
@@ -291,9 +292,9 @@ function App() {
 
   const handleEditAliasSave = async (id) => {
     if (!editKeyword || !editAlias) return;
-    
+
     const applyToPast = window.confirm('変更内容を過去のログにも反映しますか？');
-    
+
     try {
       await fetch(`${API_BASE}/aliases/${id}`, {
         method: 'PUT',
@@ -515,7 +516,6 @@ function App() {
           }
         }
 
-        const maxCount = Math.max(...heatmapData.map(d => d.count), 1);
 
         return (
           <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
@@ -573,21 +573,20 @@ function App() {
                           parseInt(d.hour) === h &&
                           parseInt(d.minute) === parseInt(m)
                         );
-                          const opacity = cell ? (cell.count / maxCount) * 0.8 + 0.1 : 0;
-                          const cellColor = cell?.color || settings.default_activity_color || 'var(--primary)';
-                          return (
-                            <div
-                              key={date}
-                              id={`cell-${date}-${h}-${m}`}
-                              className={`timetable-cell ${new Date(date).getDay() === 0 ? 'is-sunday' : new Date(date).getDay() === 6 ? 'is-saturday' : ''}`}
-                              style={{
-                                backgroundColor: cell ? cellColor : undefined,
-                                opacity: cell ? opacity : undefined,
-                                border: cell ? 'none' : undefined
-                              }}
-                              title={`${date} ${h}:${m}\nアプリ: ${cell ? cell.topApp : 'なし'}\nウィンドウ: ${cell ? cell.topWindow : 'なし'}\n占有率: ${cell ? Math.round((cell.taskCount / cell.count) * 100) : 0}% (${cell ? cell.count : 0} samples)`}
-                            />
-                          );
+                        const isIdle = cell && (cell.topApp === 'アイドル状態' || cell.topApp === '無操作');
+                        const cellColor = cell?.color || settings.default_activity_color || 'var(--primary)';
+                        return (
+                          <div
+                            key={date}
+                            id={`cell-${date}-${h}-${m}`}
+                            className={`timetable-cell ${new Date(date).getDay() === 0 ? 'is-sunday' : new Date(date).getDay() === 6 ? 'is-saturday' : ''}`}
+                            style={{
+                              backgroundColor: (cell && !isIdle) ? cellColor : undefined,
+                              border: (cell && !isIdle) ? 'none' : undefined
+                            }}
+                            title={cell ? `${date} ${h}:${m}\nアプリ: ${cell.topApp}\nウィンドウ: ${cell.topWindow}\nサンプリング数: ${cell.count} samples` : undefined}
+                          />
+                        );
                       })}
                     </React.Fragment>
                   ))}
@@ -660,7 +659,7 @@ function App() {
                       <Timer size={20} color="#6366f1" />
                       <span style={{ fontWeight: '600' }}>基本設定</span>
                     </div>
-                    
+
                     <div style={{ marginBottom: '1.5rem', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                       <div>
                         <div style={{ fontSize: '0.9rem', fontWeight: '500' }}>サンプリング間隔</div>
@@ -708,8 +707,8 @@ function App() {
                       <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
                         <Activity size={20} color="#10b981" />
                         <div>
-                          <div style={{ fontWeight: '600' }}>無操作時間の記録</div>
-                          <div style={{ fontSize: '0.8rem', color: '#94a3b8' }}>操作がない時間を「無操作」として記録します</div>
+                          <div style={{ fontWeight: '600' }}>アイドル状態の記録</div>
+                          <div style={{ fontSize: '0.8rem', color: '#94a3b8' }}>操作がない時間を「アイドル状態」として記録します</div>
                         </div>
                       </div>
                       <button
@@ -741,7 +740,7 @@ function App() {
                     {settings.record_idle === 'true' && (
                       <div style={{ borderTop: '1px solid rgba(255,255,255,0.05)', paddingTop: '1.5rem' }}>
                         <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
-                          <span style={{ fontSize: '0.9rem', color: '#94a3b8' }}>無操作判定しきい値</span>
+                          <span style={{ fontSize: '0.9rem', color: '#94a3b8' }}>アイドル判定しきい値</span>
                           <span style={{ fontWeight: '600' }}>{settings.idle_threshold || 300}秒</span>
                         </div>
                         <input
@@ -768,7 +767,7 @@ function App() {
                         <div style={{ fontSize: '0.8rem', color: '#94a3b8' }}>タイトルに含まれるキーワードを別名に変換します</div>
                       </div>
                     </div>
-                    
+
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem', marginBottom: '1.5rem', background: 'rgba(0,0,0,0.1)', padding: '1rem', borderRadius: '10px' }}>
                       <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', alignItems: 'center' }}>
                         <input
@@ -812,19 +811,19 @@ function App() {
                           <input type="checkbox" checked={newCaseSensitive} onChange={(e) => setNewCaseSensitive(e.target.checked)} />
                           大文字・小文字を区別する
                         </label>
-                          <button
-                            onClick={() => {
-                              const k = document.getElementById('new-keyword').value;
-                              const a = document.getElementById('new-alias').value;
-                              handleAddAlias(k, a, newColor, newMatchType, newCaseSensitive);
-                              document.getElementById('new-keyword').value = '';
-                              document.getElementById('new-alias').value = '';
-                              setNewCaseSensitive(false);
-                              setNewMatchType('contains');
-                              setNewColor('#6366f1');
-                            }}
-                            style={{ padding: '0.5rem 1.5rem', borderRadius: '8px', background: 'var(--primary)', color: '#fff', border: 'none', cursor: 'pointer', fontWeight: '600' }}
-                          >
+                        <button
+                          onClick={() => {
+                            const k = document.getElementById('new-keyword').value;
+                            const a = document.getElementById('new-alias').value;
+                            handleAddAlias(k, a, newColor, newMatchType, newCaseSensitive);
+                            document.getElementById('new-keyword').value = '';
+                            document.getElementById('new-alias').value = '';
+                            setNewCaseSensitive(false);
+                            setNewMatchType('contains');
+                            setNewColor('#6366f1');
+                          }}
+                          style={{ padding: '0.5rem 1.5rem', borderRadius: '8px', background: 'var(--primary)', color: '#fff', border: 'none', cursor: 'pointer', fontWeight: '600' }}
+                        >
                           追加
                         </button>
                       </div>
@@ -833,40 +832,40 @@ function App() {
                     <div className="aliases-list">
                       {(Array.isArray(aliases) ? aliases : []).map((item) => (
                         <div key={item.id} style={{ padding: '1rem', background: 'rgba(255,255,255,0.03)', borderRadius: '10px', marginBottom: '0.5rem' }}>
-                          {editingAliasId === item.id ? ( <div style={{ display: "flex", flexDirection: "column", gap: "0.75rem" }}> <div style={{ display: "flex", gap: "0.5rem", flexWrap: "wrap", alignItems: "center" }}>
-                                <input
-                                  type="text"
-                                  value={editKeyword} onChange={(e) => setEditKeyword(e.target.value)} style={{ flex: "1 1 150px", minWidth: "120px", padding: '0.5rem', borderRadius: '6px', background: 'rgba(255,255,255,0.05)', border: '1px solid var(--primary)', color: '#fff' }}
-                                />
-                                <select
-                                  value={editMatchType}
-                                  onChange={(e) => setEditMatchType(e.target.value)}
-                                  style={{ padding: '0.5rem', borderRadius: '6px', background: 'rgba(255,255,255,0.05)', border: '1px solid var(--primary)', color: '#fff' }}
-                                >
-                                  <option value="contains" style={{ color: '#000' }}>を含む</option>
-                                  <option value="starts_with" style={{ color: '#000' }}>で始まる</option>
-                                  <option value="exact" style={{ color: '#000' }}>完全一致</option>
-                                </select>
-                                <span style={{ display: 'flex', alignItems: 'center' }}>→</span>
-                                <input
-                                  type="text"
-                                  value={editAlias} onChange={(e) => setEditAlias(e.target.value)} style={{ flex: "1 1 120px", minWidth: "100px", padding: '0.5rem', borderRadius: '6px', background: 'rgba(255,255,255,0.05)', border: '1px solid var(--primary)', color: '#fff' }}
-                                />
-                                <input
-                                  type="color" value={editColor} onChange={(e) => setEditColor(e.target.value)} style={{ width: "34px", height: "34px", padding: "0", border: "none", background: "transparent", cursor: "pointer", flexShrink: 0 }}
-                                />
-                              </div>
-                              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                                <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer', fontSize: '0.85rem', color: '#94a3b8' }}>
-                                  <input type="checkbox" checked={editCaseSensitive} onChange={(e) => setEditCaseSensitive(e.target.checked)} />
-                                  大文字・小文字を区別する
-                                </label>
-                                <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', alignItems: 'center' }}>
-                                  <button onClick={() => handleEditAliasSave(item.id)} style={{ padding: '0.4rem 1rem', borderRadius: '6px', background: '#10b981', color: '#fff', border: 'none', cursor: 'pointer', fontSize: '0.85rem', fontWeight: '600' }}>保存</button>
-                                  <button onClick={handleEditAliasCancel} style={{ padding: '0.4rem 1rem', borderRadius: '6px', background: '#475569', color: '#fff', border: 'none', cursor: 'pointer', fontSize: '0.85rem' }}>キャンセル</button>
-                                </div>
+                          {editingAliasId === item.id ? (<div style={{ display: "flex", flexDirection: "column", gap: "0.75rem" }}> <div style={{ display: "flex", gap: "0.5rem", flexWrap: "wrap", alignItems: "center" }}>
+                            <input
+                              type="text"
+                              value={editKeyword} onChange={(e) => setEditKeyword(e.target.value)} style={{ flex: "1 1 150px", minWidth: "120px", padding: '0.5rem', borderRadius: '6px', background: 'rgba(255,255,255,0.05)', border: '1px solid var(--primary)', color: '#fff' }}
+                            />
+                            <select
+                              value={editMatchType}
+                              onChange={(e) => setEditMatchType(e.target.value)}
+                              style={{ padding: '0.5rem', borderRadius: '6px', background: 'rgba(255,255,255,0.05)', border: '1px solid var(--primary)', color: '#fff' }}
+                            >
+                              <option value="contains" style={{ color: '#000' }}>を含む</option>
+                              <option value="starts_with" style={{ color: '#000' }}>で始まる</option>
+                              <option value="exact" style={{ color: '#000' }}>完全一致</option>
+                            </select>
+                            <span style={{ display: 'flex', alignItems: 'center' }}>→</span>
+                            <input
+                              type="text"
+                              value={editAlias} onChange={(e) => setEditAlias(e.target.value)} style={{ flex: "1 1 120px", minWidth: "100px", padding: '0.5rem', borderRadius: '6px', background: 'rgba(255,255,255,0.05)', border: '1px solid var(--primary)', color: '#fff' }}
+                            />
+                            <input
+                              type="color" value={editColor} onChange={(e) => setEditColor(e.target.value)} style={{ width: "34px", height: "34px", padding: "0", border: "none", background: "transparent", cursor: "pointer", flexShrink: 0 }}
+                            />
+                          </div>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                              <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer', fontSize: '0.85rem', color: '#94a3b8' }}>
+                                <input type="checkbox" checked={editCaseSensitive} onChange={(e) => setEditCaseSensitive(e.target.checked)} />
+                                大文字・小文字を区別する
+                              </label>
+                              <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', alignItems: 'center' }}>
+                                <button onClick={() => handleEditAliasSave(item.id)} style={{ padding: '0.4rem 1rem', borderRadius: '6px', background: '#10b981', color: '#fff', border: 'none', cursor: 'pointer', fontSize: '0.85rem', fontWeight: '600' }}>保存</button>
+                                <button onClick={handleEditAliasCancel} style={{ padding: '0.4rem 1rem', borderRadius: '6px', background: '#475569', color: '#fff', border: 'none', cursor: 'pointer', fontSize: '0.85rem' }}>キャンセル</button>
                               </div>
                             </div>
+                          </div>
                           ) : (
                             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                               <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
@@ -945,6 +944,91 @@ function App() {
           </div>
         );
 
+      case 'help':
+        return (
+          <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
+            {renderDateHeader('ヘルプ・ガイド')}
+            <div style={{ flex: 1, overflowY: 'auto', marginTop: '1rem', paddingRight: '0.5rem' }}>
+              <div className="help-grid">
+                <section className="card fade-in" style={{ animationDelay: '0.1s' }}>
+                  <div className="card-title">
+                    <HelpCircle size={20} color="var(--primary)" /> WorkPulse の使い方
+                  </div>
+                  <div className="help-content">
+                    <h3>1. 自動記録</h3>
+                    <p>
+                      アプリを起動すると、アクティブなウィンドウのタイトルを定期的にサンプリングして記録します。
+                      「記録を開始」ボタンを押すことで、バックグラウンドでの収集が始まります。
+                    </p>
+
+                    <h3>2. タイムテーブル分析</h3>
+                    <p>
+                      「タイムテーブル」タブでは、24時間×設定期間の作業状況を色分けで確認できます。
+                      各セルは15分単位で集計されており、その時間帯で<strong>最も長く（最も多くサンプリングされた）行っていた作業</strong>が代表として表示されます。
+                    </p>
+                    <p style={{ fontSize: '0.8rem', marginTop: '0.5rem', color: 'var(--text-muted)' }}>
+                      ※「アイドル状態」や記録停止中の時間は、背景色が塗られず透明のまま表示されます。
+                    </p>
+
+                    <h3>3. エイリアス（別名）設定</h3>
+                    <p>
+                      設定画面から、特定のウィンドウタイトルに含まれるキーワードを「会議」「開発」などの分かりやすい名前に変換できます。
+                      これにより、統計データが見やすくなります。
+                    </p>
+
+                    <h3>4. データの書き出し</h3>
+                    <p>
+                      ヘッダーの「CSV」ボタンから、指定した期間のログデータをCSV形式でダウンロードできます。
+                    </p>
+                  </div>
+                </section>
+
+                <section className="card fade-in" style={{ animationDelay: '0.2s' }}>
+                  <div className="card-title">
+                    <AlertTriangle size={20} color="#fbbf24" /> ご利用上の注意
+                  </div>
+                  <div className="help-content">
+                    <div className="warning-box">
+                      <h4>プライバシーについて</h4>
+                      <p>
+                        本アプリは、操作中のウィンドウタイトルを記録します。
+                        個人情報や機密情報がタイトルに含まれる可能性があるため、共有の予定があるときは記録のオン/オフは適切に切り替えてください。
+                      </p>
+                    </div>
+
+                    <ul className="help-list">
+                      <li><strong>リソース消費:</strong> バックグラウンドでのサンプリングは軽量ですが、低スペックなPCでは動作に影響を与える場合があります。</li>
+                      <li><strong>データ保存:</strong> ログデータはローカルのデータベースに保存されます。アプリをアンインストールするとデータが失われる可能性があります。</li>
+                      <li><strong>スリープ時の記録:</strong> PCがスリープ状態、キーボードおよびマウス操作がない場合、シャットダウンされている間は記録されません。</li>
+                      <li><strong>アイドル判定:</strong> マウスやキーボードの操作が一定時間（設定可能）ない場合、自動的に「アイドル状態」として記録されます。（無効にする場合は設定でオフにしてください）</li>
+                    </ul>
+                  </div>
+                </section>
+
+                <section className="card fade-in" style={{ animationDelay: '0.3s', gridColumn: '1 / -1' }}>
+                  <div className="card-title">
+                    <Activity size={20} color="#10b981" /> 便利なヒント
+                  </div>
+                  <div className="tips-grid">
+                    <div className="tip-item">
+                      <h5>ショートカット</h5>
+                      <p>「現在時刻へジャンプ」ボタンを使うと、タイムテーブル上の今の時間を瞬時に特定できます。</p>
+                    </div>
+                    <div className="tip-item">
+                      <h5>集計単位の切り替え</h5>
+                      <p>ダッシュボードでは「アプリごと」と「ウィンドウごと」の集計をワンクリックで切り替えられます。</p>
+                    </div>
+                    <div className="tip-item">
+                      <h5>テーマ変更</h5>
+                      <p>サイドバー下のアイコンから、ダークモードとライトモードを切り替えることができます。</p>
+                    </div>
+                  </div>
+                </section>
+              </div>
+            </div>
+          </div>
+        );
+
       default:
         return null;
     }
@@ -1004,6 +1088,14 @@ function App() {
               >
                 <Settings size={20} />
                 <span>設定</span>
+              </div>
+              <div
+                className={`nav-item ${activeTab === 'help' ? 'active' : ''}`}
+                onClick={() => setActiveTab('help')}
+                title="ヘルプ"
+              >
+                <HelpCircle size={20} />
+                <span>ヘルプ</span>
               </div>
             </nav>
             <div className="sidebar-footer">
