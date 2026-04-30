@@ -58,6 +58,7 @@ function App() {
   const [activeTab, setActiveTab] = useState('dashboard');
   const timetableContainerRef = useRef(null);
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
+  const hasPrompted = useRef(false);
   const [isSaving, setIsSaving] = useState(false);
   const [isRecording, setIsRecording] = useState(false);
   const { theme, setTheme, resolvedTheme } = useTheme();
@@ -161,6 +162,33 @@ function App() {
       alert('現在の日時が表示範囲外です。');
     }
   };
+
+  useEffect(() => {
+    // データ取得が完了し、まだ確認ダイアログを表示していない場合、かつ記録中でない場合に表示
+    if (!loading && !hasPrompted.current && !isRecording) {
+      hasPrompted.current = true;
+      
+      const confirmStartup = async () => {
+        if (window.require) {
+          try {
+            const { ipcRenderer } = window.require('electron');
+            const started = await ipcRenderer.invoke('recording:confirm-start');
+            if (started) {
+              setIsRecording(true);
+              // 記録開始時はデータを即時リフレッシュ
+              setTimeout(fetchData, 1000);
+            }
+          } catch (err) {
+            console.error('起動時の確認に失敗しました:', err);
+          }
+        }
+      };
+      
+      // レンダリングが確実に完了するように少しだけ遅延させる
+      const timer = setTimeout(confirmStartup, 500);
+      return () => clearTimeout(timer);
+    }
+  }, [loading, isRecording]);
 
   useEffect(() => {
     fetchData();
