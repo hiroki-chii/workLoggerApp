@@ -314,18 +314,18 @@ function App() {
       {
         data: stats.map(s => s.count),
         backgroundColor: [
-          'rgba(99, 102, 241, 0.6)',
-          'rgba(168, 85, 247, 0.6)',
-          'rgba(34, 211, 238, 0.6)',
-          'rgba(244, 63, 94, 0.6)',
-          'rgba(251, 191, 36, 0.6)',
+          'rgba(92, 106, 196, 0.7)',
+          'rgba(156, 126, 222, 0.7)',
+          'rgba(101, 193, 184, 0.7)',
+          'rgba(229, 115, 115, 0.7)',
+          'rgba(255, 183, 77, 0.7)',
         ],
         borderColor: [
-          '#6366f1',
-          '#a855f7',
-          '#22d3ee',
-          '#f43f5e',
-          '#fbbf24',
+          '#5c6ac4',
+          '#9c7ede',
+          '#65c1b8',
+          '#e57373',
+          '#ffb74d',
         ],
         borderWidth: 1,
       },
@@ -510,7 +510,8 @@ function App() {
         }
 
         const intervals = [];
-        for (let h = 0; h < 24; h++) {
+        for (let i = 0; i < 24; i++) {
+          const h = (i + 6) % 24;
           for (let m = 0; m < 60; m += 15) {
             intervals.push({ h, m: m.toString().padStart(2, '0') });
           }
@@ -566,7 +567,7 @@ function App() {
 
                   {intervals.map(({ h, m }) => (
                     <React.Fragment key={`${h}:${m}`}>
-                      <div className="time-label sticky-left">{m === '00' ? `${h}:00` : `:${m}`}</div>
+                      <div className={`time-label sticky-left ${m === '00' ? 'is-hour-start' : ''}`}>{m === '00' ? `${h}:00` : `:${m}`}</div>
                       {dates.map(date => {
                         const cell = heatmapData.find(d =>
                           d.logDate === date &&
@@ -579,7 +580,7 @@ function App() {
                           <div
                             key={date}
                             id={`cell-${date}-${h}-${m}`}
-                            className={`timetable-cell ${new Date(date).getDay() === 0 ? 'is-sunday' : new Date(date).getDay() === 6 ? 'is-saturday' : ''}`}
+                            className={`timetable-cell ${m === '00' ? 'is-hour-start' : ''} ${new Date(date).getDay() === 0 ? 'is-sunday' : new Date(date).getDay() === 6 ? 'is-saturday' : ''}`}
                             style={{
                               backgroundColor: (cell && !isIdle) ? cellColor : undefined,
                               border: (cell && !isIdle) ? 'none' : undefined
