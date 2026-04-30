@@ -998,7 +998,24 @@ function App() {
 
                     <ul className="help-list">
                       <li><strong>リソース消費:</strong> バックグラウンドでのサンプリングは軽量ですが、低スペックなPCでは動作に影響を与える場合があります。</li>
-                      <li><strong>データ保存:</strong> ログデータはローカルのデータベースに保存されます。アプリをアンインストールするとデータが失われる可能性があります。</li>
+                      <li><strong>データの保存場所:</strong> 本アプリに関するすべてのデータは、お使いのPCの以下のディレクトリに保存されます。
+                        <div style={{ marginTop: '0.8rem', padding: '1rem', background: 'rgba(0,0,0,0.2)', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.05)' }}>
+                          <div style={{ marginBottom: '0.8rem' }}>
+                            <span style={{ fontSize: '0.8rem', color: '#94a3b8', display: 'block', marginBottom: '0.2rem' }}>■ メインデータベース (logs.db)</span>
+                            <code style={{ fontSize: '0.8rem', color: 'var(--primary)', wordBreak: 'break-all' }}>%APPDATA%\workloggerapp\logs.db</code>
+                            <p style={{ fontSize: '0.75rem', color: '#64748b', marginTop: '0.2rem' }}>※アクティビティログ、収集設定、エイリアス設定が含まれます。</p>
+                          </div>
+                          <div style={{ marginBottom: '0.8rem' }}>
+                            <span style={{ fontSize: '0.8rem', color: '#94a3b8', display: 'block', marginBottom: '0.2rem' }}>■ アプリケーション設定・キャッシュ</span>
+                            <code style={{ fontSize: '0.8rem', color: 'var(--primary)', wordBreak: 'break-all' }}>%APPDATA%\workloggerapp\</code>
+                            <p style={{ fontSize: '0.75rem', color: '#64748b', marginTop: '0.2rem' }}>※テーマ設定（ダーク/ライト）やウィンドウの状態、一時ファイルが保存されます。</p>
+                          </div>
+                          <div>
+                            <span style={{ fontSize: '0.8rem', color: '#94a3b8', display: 'block', marginBottom: '0.2rem' }}>■ エクスポートデータ</span>
+                            <p style={{ fontSize: '0.75rem', color: '#64748b' }}>CSV出力ボタンから保存したファイルは、保存時に指定したフォルダ（通常はダウンロードフォルダ等）に保存されます。</p>
+                          </div>
+                        </div>
+                      </li>
                       <li><strong>スリープ時の記録:</strong> PCがスリープ状態、キーボードおよびマウス操作がない場合、シャットダウンされている間は記録されません。</li>
                       <li><strong>アイドル判定:</strong> マウスやキーボードの操作が一定時間（設定可能）ない場合、自動的に「アイドル状態」として記録されます。（無効にする場合は設定でオフにしてください）</li>
                     </ul>
