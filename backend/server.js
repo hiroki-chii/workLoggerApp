@@ -34,7 +34,20 @@ try {
       key TEXT PRIMARY KEY,
       value TEXT
     );
+    CREATE TABLE IF NOT EXISTS window_rules (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      keyword TEXT NOT NULL,
+      replace_with TEXT NOT NULL,
+      match_type TEXT NOT NULL,
+      color TEXT
+    );
   `);
+
+  try {
+    db.prepare('ALTER TABLE window_rules ADD COLUMN color TEXT').run();
+  } catch(e) {
+    // Column already exists
+  }
 
   // DB schema updated to remove alias logic from code level
 
@@ -176,7 +189,38 @@ app.get('/api/window-titles', (req, res) => {
   }
 });
 
-// Alias APIs removed
+// Window Rules APIs
+app.get('/api/window-rules', (req, res) => {
+  try {
+    const rules = db.prepare('SELECT * FROM window_rules ORDER BY id DESC').all();
+    res.json(rules);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post('/api/window-rules', (req, res) => {
+  try {
+    const { keyword, replace_with, match_type, color } = req.body;
+    if (!keyword || !replace_with || !match_type) {
+      return res.status(400).json({ error: 'Missing required fields' });
+    }
+    const result = db.prepare('INSERT INTO window_rules (keyword, replace_with, match_type, color) VALUES (?, ?, ?, ?)').run(keyword, replace_with, match_type, color || null);
+    res.json({ success: true, id: result.lastInsertRowid });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.delete('/api/window-rules/:id', (req, res) => {
+  try {
+    const { id } = req.params;
+    db.prepare('DELETE FROM window_rules WHERE id = ?').run(id);
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
 
 app.get('/api/export', (req, res) => {
   try {

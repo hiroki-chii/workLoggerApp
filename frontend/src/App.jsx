@@ -65,10 +65,39 @@ function App() {
   const [selectedSlot, setSelectedSlot] = useState(null);
   const [isBreakdownModalOpen, setIsBreakdownModalOpen] = useState(false);
 
-  // エイリアスリストのみ取得する軽量関数
-  const fetchAliases = async () => {
-    // Removed
+  const [windowRules, setWindowRules] = useState([]);
+
+  // ウィンドウ名置換ルールの適用関数
+  const applyWindowRules = (title, rules = windowRules) => {
+    if (!title || title === 'アイドル状態' || title === '無操作') return { displayTitle: title, originalTitle: title, isReplaced: false, color: null };
+    
+    for (const rule of rules) {
+      let match = false;
+      if (rule.match_type === 'exact') match = title === rule.keyword;
+      else if (rule.match_type === 'startsWith') match = title.startsWith(rule.keyword);
+      else match = title.includes(rule.keyword); // contains
+      
+      if (match) {
+        return { displayTitle: rule.replace_with, originalTitle: title, isReplaced: true, color: rule.color };
+      }
+    }
+    return { displayTitle: title, originalTitle: title, isReplaced: false, color: null };
   };
+
+  const fetchWindowRules = async () => {
+    try {
+      const res = await fetch(`${API_BASE}/window-rules`);
+      if (res.ok) {
+        const data = await res.json();
+        setWindowRules(data);
+        return data;
+      }
+    } catch (err) {
+      console.error('置換ルールの取得に失敗しました:', err);
+    }
+    return [];
+  };
+
 
   const fetchData = async () => {
     try {
@@ -77,12 +106,13 @@ function App() {
         endDate: dateRange.end
       }).toString();
 
-      const [statsRes, logsRes, heatmapRes, settingsRes, titlesRes] = await Promise.all([
+      const [statsRes, logsRes, heatmapRes, settingsRes, titlesRes, rulesRes] = await Promise.all([
         fetch(`${API_BASE}/stats?${params}&groupBy=${groupBy}`),
         fetch(`${API_BASE}/logs?${params}`),
         fetch(`${API_BASE}/heatmap?${params}&groupBy=${groupBy}`),
         fetch(`${API_BASE}/settings`),
-        fetch(`${API_BASE}/window-titles`)
+        fetch(`${API_BASE}/window-titles`),
+        fetch(`${API_BASE}/window-rules`)
       ]);
 
       if (!statsRes.ok || !logsRes.ok || !heatmapRes.ok || !settingsRes.ok) {
@@ -94,10 +124,36 @@ function App() {
       const heatmapData = await heatmapRes.json();
       const settingsData = await settingsRes.json();
       const titlesData = await titlesRes.json();
+      const rulesData = await rulesRes.json();
+      
+      setWindowRules(rulesData);
 
-      setStats(statsData);
-      setLogs(logsData);
-      setHeatmapData(heatmapData);
+      // フロントエンドでの表示名置換と再集計
+      const processedLogs = logsData.map(log => ({ ...log, ...applyWindowRules(log.windowTitle, rulesData) }));
+      
+      // heatmapData の置換
+      const processedHeatmap = heatmapData.map(cell => {
+        const titleToApply = cell.topWindow || '';
+        const ruleResult = applyWindowRules(titleToApply, rulesData);
+        return { ...cell, topWindowDisplay: ruleResult.displayTitle, topWindowOriginal: ruleResult.originalTitle, color: ruleResult.color };
+      });
+
+      // statsData の置換と再集計（groupBy === 'windowTitle' の場合）
+      let processedStats = statsData;
+      if (groupBy === 'windowTitle') {
+        const mergedStats = {};
+        statsData.forEach(stat => {
+          const ruleResult = applyWindowRules(stat.name, rulesData);
+          const disp = ruleResult.displayTitle;
+          if (!mergedStats[disp]) mergedStats[disp] = { name: disp, count: 0, color: ruleResult.color };
+          mergedStats[disp].count += stat.count;
+        });
+        processedStats = Object.values(mergedStats).sort((a, b) => b.count - a.count);
+      }
+
+      setStats(processedStats);
+      setLogs(processedLogs);
+      setHeatmapData(processedHeatmap);
       setSettings(settingsData);
       setWindowTitles(Array.isArray(titlesData) ? titlesData : []);
       setError(null);
@@ -273,7 +329,8 @@ function App() {
       const res = await fetch(`${API_BASE}/logs/breakdown?date=${date}&hour=${hour}&minute=${minute}`);
       if (res.ok) {
         const data = await res.json();
-        setBreakdownLogs(data);
+        const processedData = data.map(log => ({ ...log, ...applyWindowRules(log.windowTitle) }));
+        setBreakdownLogs(processedData);
       }
     } catch (err) {
       console.error('内訳の取得に失敗しました:', err);
@@ -371,7 +428,7 @@ function App() {
                     className="progress-fill"
                     style={{
                       width: `${(s.count / total) * 100}%`,
-                      background: `linear-gradient(90deg, var(--primary), var(--accent))`
+                      background: s.color ? s.color : `linear-gradient(90deg, var(--primary), var(--accent))`
                     }}
                   />
                 </div>
@@ -578,7 +635,7 @@ function App() {
                               cursor: cell ? 'pointer' : 'default'
                             }}
                             onClick={() => cell && handleCellClick(date, h, m)}
-                            title={cell ? `${date} ${h}:${m}\nアプリ: ${cell.topApp}\nウィンドウ: ${cell.topWindow}\nサンプリング数: ${cell.count} samples\n(クリックで内訳を表示)` : undefined}
+                            title={cell ? `${date} ${h}:${m}\nアプリ: ${cell.topApp}\nウィンドウ: ${cell.topWindowDisplay}${cell.topWindowDisplay !== cell.topWindowOriginal ? ` (${cell.topWindowOriginal})` : ''}\nサンプリング数: ${cell.count} samples\n(クリックで内訳を表示)` : undefined}
                           />
                         );
                       })}
@@ -616,13 +673,13 @@ function App() {
                           <td className="timestamp">{new Date(log.timestamp).toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}</td>
                           <td><span className="app-badge">{log.appName}</span></td>
                           <td style={{ maxWidth: '400px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                            {log.alias ? (
+                            {log.isReplaced ? (
                               <>
-                                <span style={{ color: aliases.find(a => a.alias === log.alias)?.color || settings.default_activity_color || 'var(--primary)', fontWeight: '600', marginRight: '8px' }}>{log.alias}</span>
-                                <span style={{ color: '#94a3b8', fontSize: '0.85em' }} title={log.windowTitle}>({log.windowTitle})</span>
+                                <span style={{ color: log.color || 'var(--primary)', fontWeight: '600', marginRight: '8px' }}>{log.displayTitle}</span>
+                                <span style={{ color: '#94a3b8', fontSize: '0.85em' }} title={log.originalTitle}>({log.originalTitle})</span>
                               </>
                             ) : (
-                              <span title={log.windowTitle}>{log.windowTitle}</span>
+                              <span title={log.displayTitle}>{log.displayTitle}</span>
                             )}
                           </td>
                         </tr>
@@ -750,7 +807,114 @@ function App() {
                     )}
                   </div>
 
-                  {/* エイリアス設定セクション削除 */}
+                  {/* 表示名置換ルール設定セクション */}
+                  <div style={{ marginBottom: '2rem', padding: '1.5rem', background: 'rgba(255,255,255,0.02)', borderRadius: '16px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '1.5rem' }}>
+                      <Settings size={20} color="#8b5cf6" />
+                      <div>
+                        <div style={{ fontWeight: '600' }}>表示名置換ルール</div>
+                        <div style={{ fontSize: '0.8rem', color: '#94a3b8' }}>特定のウィンドウ名を、管理しやすい名前に置き換えて表示します。</div>
+                      </div>
+                    </div>
+
+                    <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '1rem', flexWrap: 'wrap' }}>
+                      <datalist id="windowTitlesList">
+                        {windowTitles.map((title, i) => (
+                          <option key={i} value={title} />
+                        ))}
+                      </datalist>
+                      <input 
+                        type="text" 
+                        id="newRuleKeyword"
+                        list="windowTitlesList"
+                        placeholder="キーワード (例: Google Chrome)" 
+                        style={{ flex: 1, padding: '0.5rem', borderRadius: '6px', border: '1px solid rgba(255,255,255,0.1)', background: 'rgba(0,0,0,0.2)', color: 'var(--text)' }}
+                      />
+                      <select id="newRuleMatchType" style={{ padding: '0.5rem', borderRadius: '6px', border: '1px solid rgba(255,255,255,0.1)', background: 'rgba(0,0,0,0.2)', color: 'var(--text)' }}>
+                        <option value="contains">部分一致</option>
+                        <option value="startsWith">前方一致</option>
+                        <option value="exact">完全一致</option>
+                      </select>
+                      <input 
+                        type="text" 
+                        id="newRuleReplace"
+                        placeholder="置換後の名前 (例: ブラウザ)" 
+                        style={{ flex: 1, padding: '0.5rem', borderRadius: '6px', border: '1px solid rgba(255,255,255,0.1)', background: 'rgba(0,0,0,0.2)', color: 'var(--text)' }}
+                      />
+                      <input 
+                        type="color" 
+                        id="newRuleColor"
+                        defaultValue="#5c6ac4"
+                        style={{ width: '38px', height: '38px', padding: '0.1rem', borderRadius: '6px', border: '1px solid rgba(255,255,255,0.1)', background: 'rgba(0,0,0,0.2)', cursor: 'pointer', flexShrink: 0 }}
+                        title="表示色を選択"
+                      />
+                      <button 
+                        onClick={async () => {
+                          const keyword = document.getElementById('newRuleKeyword').value;
+                          const replace_with = document.getElementById('newRuleReplace').value;
+                          const match_type = document.getElementById('newRuleMatchType').value;
+                          const color = document.getElementById('newRuleColor').value;
+                          if (!keyword || !replace_with) return alert('キーワードと置換後の名前を入力してください');
+                          
+                          try {
+                            const res = await fetch(`${API_BASE}/window-rules`, {
+                              method: 'POST',
+                              headers: { 'Content-Type': 'application/json' },
+                              body: JSON.stringify({ keyword, replace_with, match_type, color })
+                            });
+                            if (res.ok) {
+                              document.getElementById('newRuleKeyword').value = '';
+                              document.getElementById('newRuleReplace').value = '';
+                              const updatedRules = await fetchWindowRules();
+                              fetchData(); // データをリロードして新しいルールを適用
+                            }
+                          } catch (err) {
+                            console.error(err);
+                          }
+                        }}
+                        style={{ padding: '0.5rem 1rem', borderRadius: '6px', background: 'var(--primary)', color: '#fff', border: 'none', cursor: 'pointer', fontWeight: '500' }}
+                      >
+                        追加
+                      </button>
+                    </div>
+
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                      {windowRules.map(rule => (
+                        <div key={rule.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0.75rem', background: 'rgba(0,0,0,0.2)', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.05)' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', overflow: 'hidden' }}>
+                            <div style={{ padding: '0.2rem 0.5rem', fontSize: '0.75rem', background: 'rgba(139, 92, 246, 0.2)', color: '#a78bfa', borderRadius: '4px', whiteSpace: 'nowrap' }}>
+                              {rule.match_type === 'exact' ? '完全一致' : rule.match_type === 'startsWith' ? '前方一致' : '部分一致'}
+                            </div>
+                            <div style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', color: '#94a3b8' }}>
+                              <span style={{ color: 'var(--text)' }}>{rule.keyword}</span>
+                            </div>
+                            <div style={{ color: '#64748b' }}>→</div>
+                            <div style={{ fontWeight: '500', color: rule.color || 'var(--primary)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                              {rule.replace_with}
+                            </div>
+                          </div>
+                          <button 
+                            onClick={async () => {
+                              try {
+                                await fetch(`${API_BASE}/window-rules/${rule.id}`, { method: 'DELETE' });
+                                await fetchWindowRules();
+                                fetchData();
+                              } catch(e) {}
+                            }}
+                            style={{ background: 'none', border: 'none', color: '#f87171', cursor: 'pointer', padding: '0.2rem' }}
+                            title="削除"
+                          >
+                            <Trash2 size={16} />
+                          </button>
+                        </div>
+                      ))}
+                      {windowRules.length === 0 && (
+                        <div style={{ textAlign: 'center', padding: '1rem', color: '#64748b', fontSize: '0.85rem' }}>
+                          設定されたルールはありません
+                        </div>
+                      )}
+                    </div>
+                  </div>
 
 
                   <div style={{ marginBottom: '2rem', padding: '1.5rem', background: 'rgba(239, 68, 68, 0.05)', border: '1px solid rgba(239, 68, 68, 0.1)', borderRadius: '16px' }}>
@@ -1149,8 +1313,15 @@ function App() {
                             {new Date(log.timestamp).toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
                           </td>
                           <td style={{ padding: '0.75rem' }}><span className="app-badge">{log.appName}</span></td>
-                          <td style={{ padding: '0.75rem', maxWidth: '300px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={log.windowTitle}>
-                            {log.windowTitle}
+                          <td style={{ padding: '0.75rem', maxWidth: '300px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={log.originalTitle}>
+                            {log.isReplaced ? (
+                              <>
+                                <span style={{ color: log.color || 'var(--primary)', fontWeight: '600', marginRight: '8px' }}>{log.displayTitle}</span>
+                                <span style={{ color: '#94a3b8', fontSize: '0.85em' }}>({log.originalTitle})</span>
+                              </>
+                            ) : (
+                              log.displayTitle
+                            )}
                           </td>
                         </tr>
                       ))}
