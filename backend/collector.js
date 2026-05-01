@@ -5,7 +5,7 @@ const fs = require('fs');
 
 const DB_PATH = process.env.DB_PATH || path.join(process.env.APPDATA, 'workloggerapp', 'logs.db');
 const MONITOR_SCRIPT = process.env.MONITOR_SCRIPT_PATH || path.join(__dirname, 'monitor.ps1');
-const IDLE_THRESHOLD_SECONDS = 300;
+
 
 let db;
 function getDb() {
@@ -56,7 +56,6 @@ async function collect() {
         let shouldLog = false;
         let logApp = result.appName;
         let logWindow = result.windowTitle;
-        let logAlias = null;
 
         if (result.idleSeconds >= settings.idleThreshold) {
           if (settings.recordIdle) {
@@ -72,10 +71,6 @@ async function collect() {
             result.appName.toLowerCase().includes('workloggerapp') ||
             result.windowTitle.includes('WorkPulse');
 
-          if (!isSelf) {
-            shouldLog = true;
-          }
-          
           if (!isSelf) {
             shouldLog = true;
           }

@@ -145,3 +145,30 @@
      -   * * U I 9e�U* * :   �0�0�0�0�0�}Ɩ�0�0�0�0k0f00C t r l   +   E n t e r g0�OX[0E s c g0�}Ɩn0�S�mL0g0M0�0�0�0�0�0�0�0�0�0�0�0�0�0�0���RW00�d\O'`�0T
 NU0[0~0W0_00 
  
+### 実行ファイルのビルド
+- 2026-05-01 11:11: 最新の修正（ルール編集機能など）を反映して再ビルドを実施。
+- `npm run build` を実行し、`dist-pulse` フォルダ内の `PulseWork 1.0.0.exe` を更新。
+
+## 2026-05-01 11:19 - コード分析（重複・未使用コード調査）
+- プロジェクト全体を調査し、重複コード4箇所、未使用ファイル3件、未使用変数/定数/CSS 4箇所、DB残骸1件を特定
+- 詳細は code_analysis.md アーティファクトに記載
+- 主な発見: collector.jsのshouldLog重複、ルートmain.jsの未使用、fetchWindowRulesとfetchDataのAPI二重呼び出し等
+
+## 2026-05-01 11:24 - コードクリーンアップ実施
+### 削除したファイル
+- `main.js`（ルート）: 旧エントリーポイント、未使用
+- `check_db.js`: デバッグスクリプト
+- `electron-core/diag.js`: 診断スクリプト
+- `backend/logs.db`: DB残骸
+
+### コード修正
+- `collector.js`: 重複`shouldLog = true`削除、未使用`IDLE_THRESHOLD_SECONDS`/`logAlias`削除
+- `App.jsx`: 未使用`Cpu`インポート削除、`fetchWindowRules`関数と二重API呼出し統合、ウィンドウタイトル表示JSXを`renderWindowTitle`ヘルパーに共通化
+- `App.css`: 未使用`.export-btn`クラス削除
+- `.gitignore`: `*.db`と`scratch/`を追加
+
+### ビルド確認
+- `npx vite build` 成功
+
+## 2026-05-01 11:43 - GitHubプッシュ
+- 最新のコード変更とクリーンアップ結果をリモートリポジトリへ同期

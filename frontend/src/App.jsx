@@ -10,7 +10,7 @@ import {
   PieChart,
   List,
   LayoutGrid,
-  Cpu,
+
   RefreshCw,
   Timer,
   Play,
@@ -87,19 +87,19 @@ function App() {
     return { displayTitle: title, originalTitle: title, isReplaced: false, color: null };
   };
 
-  const fetchWindowRules = async () => {
-    try {
-      const res = await fetch(`${API_BASE}/window-rules`);
-      if (res.ok) {
-        const data = await res.json();
-        setWindowRules(data);
-        return data;
-      }
-    } catch (err) {
-      console.error('置換ルールの取得に失敗しました:', err);
+  // ウィンドウタイトル表示用の共通ヘルパー
+  const renderWindowTitle = (log) => {
+    if (log.isReplaced) {
+      return (
+        <>
+          <span style={{ color: log.color || 'var(--primary)', fontWeight: '600', marginRight: '8px' }}>{log.displayTitle}</span>
+          <span style={{ color: '#94a3b8', fontSize: '0.85em' }} title={log.originalTitle}>({log.originalTitle})</span>
+        </>
+      );
     }
-    return [];
+    return <span title={log.displayTitle}>{log.displayTitle}</span>;
   };
+
 
 
   const fetchData = async () => {
@@ -676,14 +676,7 @@ function App() {
                           <td className="timestamp">{new Date(log.timestamp).toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}</td>
                           <td><span className="app-badge">{log.appName}</span></td>
                           <td style={{ maxWidth: '400px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                            {log.isReplaced ? (
-                              <>
-                                <span style={{ color: log.color || 'var(--primary)', fontWeight: '600', marginRight: '8px' }}>{log.displayTitle}</span>
-                                <span style={{ color: '#94a3b8', fontSize: '0.85em' }} title={log.originalTitle}>({log.originalTitle})</span>
-                              </>
-                            ) : (
-                              <span title={log.displayTitle}>{log.displayTitle}</span>
-                            )}
+                            {renderWindowTitle(log)}
                           </td>
                         </tr>
                       ))}
@@ -868,7 +861,6 @@ function App() {
                             if (res.ok) {
                               document.getElementById('newRuleKeyword').value = '';
                               document.getElementById('newRuleReplace').value = '';
-                              const updatedRules = await fetchWindowRules();
                               fetchData(); // データをリロードして新しいルールを適用
                             }
                           } catch (err) {
@@ -900,7 +892,6 @@ function App() {
                                   });
                                   if (res.ok) {
                                     setEditingRuleId(null);
-                                    await fetchWindowRules();
                                     fetchData();
                                   }
                                 } catch (err) {
@@ -949,7 +940,6 @@ function App() {
                                     });
                                     if (res.ok) {
                                       setEditingRuleId(null);
-                                      await fetchWindowRules();
                                       fetchData();
                                     }
                                   } catch (e) {
@@ -999,7 +989,6 @@ function App() {
                                 onClick={async () => {
                                   try {
                                     await fetch(`${API_BASE}/window-rules/${rule.id}`, { method: 'DELETE' });
-                                    await fetchWindowRules();
                                     fetchData();
                                   } catch(e) {}
                                 }}
@@ -1418,14 +1407,7 @@ function App() {
                           </td>
                           <td style={{ padding: '0.75rem' }}><span className="app-badge">{log.appName}</span></td>
                           <td style={{ padding: '0.75rem', maxWidth: '300px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={log.originalTitle}>
-                            {log.isReplaced ? (
-                              <>
-                                <span style={{ color: log.color || 'var(--primary)', fontWeight: '600', marginRight: '8px' }}>{log.displayTitle}</span>
-                                <span style={{ color: '#94a3b8', fontSize: '0.85em' }}>({log.originalTitle})</span>
-                              </>
-                            ) : (
-                              log.displayTitle
-                            )}
+                            {renderWindowTitle(log)}
                           </td>
                         </tr>
                       ))}
