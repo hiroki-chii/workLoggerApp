@@ -44,7 +44,7 @@ function App() {
   const [stats, setStats] = useState([]);
   const [heatmapData, setHeatmapData] = useState([]);
   const [logs, setLogs] = useState([]);
-  const [settings, setSettings] = useState({ sampling_interval: '30' });
+  const [settings, setSettings] = useState({ sampling_interval: '10', default_activity_color: '#6366f1' });
   const [windowTitles, setWindowTitles] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -130,6 +130,12 @@ function App() {
       const titlesData = await titlesRes.json();
       const rulesData = await rulesRes.json();
       
+      const finalSettings = {
+        ...settingsData,
+        sampling_interval: '10',
+        default_activity_color: '#6366f1'
+      };
+      
       setWindowRules(rulesData);
 
       // フロントエンドでの表示名置換と再集計
@@ -158,7 +164,7 @@ function App() {
       setStats(processedStats);
       setLogs(processedLogs);
       setHeatmapData(processedHeatmap);
-      setSettings(settingsData);
+      setSettings(finalSettings);
       setWindowTitles(Array.isArray(titlesData) ? titlesData : []);
       setError(null);
       setLoading(false);
@@ -257,7 +263,7 @@ function App() {
 
   const handleSaveSetting = async (key, value) => {
     let finalValue = value.toString();
-    const samplingInterval = parseInt(settings.sampling_interval || 30);
+    const samplingInterval = parseInt(settings.sampling_interval || 10);
     const idleThreshold = parseInt(settings.idle_threshold || 300);
 
     // バリデーション: アイドリング判定しきい値はサンプリング間隔以上である必要がある。また、上限を600秒に制限。
@@ -360,7 +366,7 @@ function App() {
     });
 
     const total = breakdownLogs.length;
-    const interval = parseInt(settings.sampling_interval || 30);
+    const interval = parseInt(settings.sampling_interval || 10);
 
     return Object.values(summaryMap)
       .map(item => ({
@@ -431,7 +437,7 @@ function App() {
                 <div className="top-app-info">
                   <span className="app-rank">{i + 1}</span>
                   <span className="app-name">{s.name || s.appName}</span>
-                  <span className="app-percentage">{Math.round((s.count / total) * 100)}% ({Math.round((s.count * parseInt(settings.sampling_interval || 30)) / 60)}分)</span>
+                  <span className="app-percentage">{Math.round((s.count / total) * 100)}% ({Math.round((s.count * parseInt(settings.sampling_interval || 10)) / 60)}分)</span>
                 </div>
                 <div className="progress-bar">
                   <div
@@ -708,58 +714,10 @@ function App() {
                 </div>
                 <div style={{ padding: '1.5rem' }}>
                   <div style={{ marginBottom: '2rem', padding: '1.5rem', background: 'rgba(255,255,255,0.02)', borderRadius: '16px' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '1.5rem' }}>
-                      <Timer size={20} color="#6366f1" />
-                      <span style={{ fontWeight: '600' }}>基本設定</span>
-                    </div>
-
-                    <div style={{ marginBottom: '1.5rem', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                      <div>
-                        <div style={{ fontSize: '0.9rem', fontWeight: '500' }}>記録する間隔（秒）</div>
-                        <div style={{ fontSize: '0.8rem', color: '#94a3b8' }}>どのくらいの頻度で作業状況を記録するかを設定します</div>
-                      </div>
-                      <div style={{ display: 'flex', gap: '0.5rem' }}>
-                        {[10, 30, 60].map((interval) => (
-                          <button
-                            key={interval}
-                            onClick={() => handleSaveSetting('sampling_interval', interval)}
-                            style={{
-                              padding: '0.4rem 0.8rem',
-                              borderRadius: '8px',
-                              border: '1px solid',
-                              borderColor: settings.sampling_interval === interval.toString() ? '#6366f1' : 'rgba(255,255,255,0.1)',
-                              background: settings.sampling_interval === interval.toString() ? 'rgba(99, 102, 241, 0.2)' : 'transparent',
-                              color: settings.sampling_interval === interval.toString() ? '#fff' : '#94a3b8',
-                              cursor: 'pointer',
-                              fontSize: '0.8rem',
-                              transition: 'all 0.2s'
-                            }}
-                          >
-                            {interval}s
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-
-                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                      <div>
-                        <div style={{ fontSize: '0.9rem', fontWeight: '500' }}>標準の色</div>
-                        <div style={{ fontSize: '0.8rem', color: '#94a3b8' }}>表示名変更のルールがないときの色</div>
-                      </div>
-                      <input
-                        type="color"
-                        value={settings.default_activity_color || '#6366f1'}
-                        onChange={(e) => handleSaveSetting('default_activity_color', e.target.value)}
-                        style={{ width: '40px', height: '40px', padding: '0', border: 'none', background: 'transparent', cursor: 'pointer' }}
-                      />
-                    </div>
-                  </div>
-
-                  <div style={{ marginBottom: '2rem', padding: '1.5rem', background: 'rgba(255,255,255,0.02)', borderRadius: '16px' }}>
                     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1.5rem' }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flex: 1, marginRight: '1rem' }}>
                         <Activity size={20} color="#10b981" />
-                        <div>
+                        <div style={{ flex: 1 }}>
                           <div style={{ fontWeight: '600' }}>操作していない時間の記録</div>
                           <div style={{ fontSize: '0.8rem', color: '#94a3b8' }}>操作がない時間について、「操作していない時間」として記録するか、開いていたウィンドウ名のまま記録するかを選択します</div>
                         </div>
@@ -774,7 +732,8 @@ function App() {
                           position: 'relative',
                           border: 'none',
                           cursor: 'pointer',
-                          transition: 'background 0.3s'
+                          transition: 'background 0.3s',
+                          flexShrink: 0
                         }}
                       >
                         <div style={{
@@ -1115,6 +1074,9 @@ function App() {
                     <p>
                       アプリを起動すると、アクティブなウィンドウの名前を定期的にバックグラウンドで記録します。
                       サイドバーの「記録を開始」ボタンを押すことで、収集が始まります。
+                    </p>
+                    <p style={{ fontSize: '0.8rem', marginTop: '0.5rem', color: 'var(--text-muted)' }}>
+                      ※記録する間隔は10秒に固定されています。
                     </p>
 
                     <h3>2. 時間ごとの活動（タイムテーブル）</h3>

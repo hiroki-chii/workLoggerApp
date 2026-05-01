@@ -23,13 +23,13 @@ function getSettings() {
     const settings = {};
     rows.forEach(r => { settings[r.key] = r.value; });
     return {
-      interval: parseInt(settings.sampling_interval || 30) * 1000,
+      interval: 10 * 1000,
       recordIdle: settings.record_idle === 'true',
       idleThreshold: parseInt(settings.idle_threshold || 300),
       idleDisplayMode: settings.idle_display_mode || 'idle'
     };
   } catch (err) {
-    return { interval: 30000, recordIdle: false, idleThreshold: 300, idleDisplayMode: 'idle' };
+    return { interval: 10000, recordIdle: false, idleThreshold: 300, idleDisplayMode: 'idle' };
   }
 }
 
