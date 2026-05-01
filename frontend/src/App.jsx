@@ -56,7 +56,7 @@ function App() {
   const [isRecording, setIsRecording] = useState(false);
   const { theme, setTheme, resolvedTheme } = useTheme();
   // ローカル時刻基準で 'YYYY-MM-DD' を取得
-  const today = new Date().toLocaleDateString('sv-SE'); 
+  const today = new Date().toLocaleDateString('sv-SE');
   const [isExportModalOpen, setIsExportModalOpen] = useState(false);
   const [exportRange, setExportRange] = useState({ start: today, end: today });
   const [dateRange, setDateRange] = useState({ start: today, end: today });
@@ -74,13 +74,13 @@ function App() {
   // ウィンドウ名置換ルールの適用関数
   const applyWindowRules = (title, rules = windowRules) => {
     if (!title || title === 'アイドル状態' || title === '無操作') return { displayTitle: title, originalTitle: title, isReplaced: false, color: null };
-    
+
     for (const rule of rules) {
       let match = false;
       if (rule.match_type === 'exact') match = title === rule.keyword;
       else if (rule.match_type === 'startsWith') match = title.startsWith(rule.keyword);
       else match = title.includes(rule.keyword); // contains
-      
+
       if (match) {
         return { displayTitle: rule.replace_with, originalTitle: title, isReplaced: true, color: rule.color };
       }
@@ -129,18 +129,18 @@ function App() {
       const settingsData = await settingsRes.json();
       const titlesData = await titlesRes.json();
       const rulesData = await rulesRes.json();
-      
+
       const finalSettings = {
         ...settingsData,
         sampling_interval: '10',
         default_activity_color: '#6366f1'
       };
-      
+
       setWindowRules(rulesData);
 
       // フロントエンドでの表示名置換と再集計
       const processedLogs = logsData.map(log => ({ ...log, ...applyWindowRules(log.windowTitle, rulesData) }));
-      
+
       // heatmapData の置換
       const processedHeatmap = heatmapData.map(cell => {
         const titleToApply = cell.topWindow || '';
@@ -317,7 +317,7 @@ function App() {
     if (mode === 'range') {
       url += `?startDate=${exportRange.start}&endDate=${exportRange.end}`;
     }
-    
+
     // Create a temporary link to trigger download
     const link = document.createElement('a');
     link.href = url;
@@ -329,12 +329,12 @@ function App() {
   };
 
   // Alias handlers removed
-  
+
   const handleCellClick = async (date, hour, minute) => {
     setSelectedSlot({ date, hour, minute });
     setIsBreakdownModalOpen(true);
     setBreakdownLogs([]); // Reset previous logs
-    
+
     try {
       const res = await fetch(`${API_BASE}/logs/breakdown?date=${date}&hour=${hour}&minute=${minute}`);
       if (res.ok) {
@@ -349,7 +349,7 @@ function App() {
 
   const getBreakdownSummary = () => {
     if (!breakdownLogs.length) return [];
-    
+
     const summaryMap = {};
     breakdownLogs.forEach(log => {
       const key = breakdownGroupBy === 'appName' ? log.appName : log.displayTitle;
@@ -758,15 +758,12 @@ function App() {
                         <input
                           type="range"
                           min="10"
-                          max="600"
+                          max="300"
                           step="10"
                           value={settings.idle_threshold || 300}
                           onChange={(e) => handleSaveSetting('idle_threshold', e.target.value)}
                           style={{ width: '100%', accentColor: '#10b981' }}
                         />
-                        <div style={{ fontSize: '0.7rem', color: '#64748b', marginTop: '0.25rem' }}>
-                          ※記録する間隔（{settings.sampling_interval}秒）以上の値を設定してください
-                        </div>
 
                         <div style={{ borderTop: '1px solid rgba(255,255,255,0.05)', paddingTop: '1.5rem', marginTop: '1.5rem' }}>
                           <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
@@ -787,7 +784,7 @@ function App() {
                                 transition: 'all 0.2s'
                               }}
                             >
-                              操作していない
+                              アイドル状態
                             </button>
                             <button
                               onClick={() => handleSaveSetting('idle_display_mode', 'active_window')}
@@ -827,11 +824,11 @@ function App() {
                           <option key={i} value={title} />
                         ))}
                       </datalist>
-                      <input 
-                        type="text" 
+                      <input
+                        type="text"
                         id="newRuleKeyword"
                         list="windowTitlesList"
-                        placeholder="キーワード (例: Google Chrome)" 
+                        placeholder="キーワード (例: Google Chrome)"
                         style={{ flex: 1, padding: '0.5rem', borderRadius: '6px', border: '1px solid rgba(255,255,255,0.1)', background: 'rgba(0,0,0,0.2)', color: 'var(--text)' }}
                       />
                       <select id="newRuleMatchType" style={{ padding: '0.5rem', borderRadius: '6px', border: '1px solid rgba(255,255,255,0.1)', background: 'rgba(0,0,0,0.2)', color: 'var(--text)' }}>
@@ -839,27 +836,27 @@ function App() {
                         <option value="startsWith">から始まる</option>
                         <option value="exact">と同じ</option>
                       </select>
-                      <input 
-                        type="text" 
+                      <input
+                        type="text"
                         id="newRuleReplace"
-                        placeholder="変更後の名前 (例: ブラウザ)" 
+                        placeholder="変更後の名前 (例: ブラウザ)"
                         style={{ flex: 1, padding: '0.5rem', borderRadius: '6px', border: '1px solid rgba(255,255,255,0.1)', background: 'rgba(0,0,0,0.2)', color: 'var(--text)' }}
                       />
-                      <input 
-                        type="color" 
+                      <input
+                        type="color"
                         id="newRuleColor"
                         defaultValue="#5c6ac4"
                         style={{ width: '38px', height: '38px', padding: '0.1rem', borderRadius: '6px', border: '1px solid rgba(255,255,255,0.1)', background: 'rgba(0,0,0,0.2)', cursor: 'pointer', flexShrink: 0 }}
                         title="表示色を選択"
                       />
-                      <button 
+                      <button
                         onClick={async () => {
                           const keyword = document.getElementById('newRuleKeyword').value;
                           const replace_with = document.getElementById('newRuleReplace').value;
                           const match_type = document.getElementById('newRuleMatchType').value;
                           const color = document.getElementById('newRuleColor').value;
                           if (!keyword || !replace_with) return alert('キーワードと変更後の名前を入力してください');
-                          
+
                           try {
                             const res = await fetch(`${API_BASE}/window-rules`, {
                               method: 'POST',
@@ -884,8 +881,8 @@ function App() {
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
                       {windowRules.map(rule => (
                         editingRuleId === rule.id ? (
-                          <div 
-                            key={rule.id} 
+                          <div
+                            key={rule.id}
                             style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', padding: '0.75rem', background: 'rgba(0,0,0,0.2)', borderRadius: '8px', border: '1px solid #6366f1', flexWrap: 'wrap' }}
                             onKeyDown={async (e) => {
                               if (e.key === 'Escape') {
@@ -908,15 +905,15 @@ function App() {
                               }
                             }}
                           >
-                            <input 
-                              type="text" 
+                            <input
+                              type="text"
                               value={editForm.keyword}
-                              onChange={(e) => setEditForm({...editForm, keyword: e.target.value})}
+                              onChange={(e) => setEditForm({ ...editForm, keyword: e.target.value })}
                               style={{ flex: 1, minWidth: '150px', padding: '0.4rem', borderRadius: '4px', border: '1px solid rgba(255,255,255,0.2)', background: 'rgba(0,0,0,0.3)', color: 'var(--text)', fontSize: '0.85rem' }}
                             />
-                            <select 
+                            <select
                               value={editForm.match_type}
-                              onChange={(e) => setEditForm({...editForm, match_type: e.target.value})}
+                              onChange={(e) => setEditForm({ ...editForm, match_type: e.target.value })}
                               style={{ padding: '0.4rem', borderRadius: '4px', border: '1px solid rgba(255,255,255,0.2)', background: 'rgba(0,0,0,0.3)', color: 'var(--text)', fontSize: '0.85rem' }}
                             >
                               <option value="contains">を含む</option>
@@ -924,20 +921,20 @@ function App() {
                               <option value="exact">と同じ</option>
                             </select>
                             <span style={{ color: '#64748b' }}>→</span>
-                            <input 
-                              type="text" 
+                            <input
+                              type="text"
                               value={editForm.replace_with}
-                              onChange={(e) => setEditForm({...editForm, replace_with: e.target.value})}
+                              onChange={(e) => setEditForm({ ...editForm, replace_with: e.target.value })}
                               style={{ flex: 1, minWidth: '150px', padding: '0.4rem', borderRadius: '4px', border: '1px solid rgba(255,255,255,0.2)', background: 'rgba(0,0,0,0.3)', color: 'var(--text)', fontSize: '0.85rem' }}
                             />
-                            <input 
-                              type="color" 
+                            <input
+                              type="color"
                               value={editForm.color || '#5c6ac4'}
-                              onChange={(e) => setEditForm({...editForm, color: e.target.value})}
+                              onChange={(e) => setEditForm({ ...editForm, color: e.target.value })}
                               style={{ width: '32px', height: '32px', padding: '0', border: 'none', background: 'transparent', cursor: 'pointer', flexShrink: 0 }}
                             />
                             <div style={{ display: 'flex', gap: '0.4rem' }}>
-                              <button 
+                              <button
                                 onClick={async () => {
                                   if (!editForm.keyword || !editForm.replace_with) return alert('キーワードと変更後の名前を入力してください');
                                   try {
@@ -959,7 +956,7 @@ function App() {
                               >
                                 保存
                               </button>
-                              <button 
+                              <button
                                 onClick={() => setEditingRuleId(null)}
                                 style={{ padding: '0.4rem 0.8rem', borderRadius: '4px', background: '#475569', color: '#fff', border: 'none', cursor: 'pointer', fontSize: '0.8rem', fontWeight: '500' }}
                                 title="取消 (Esc)"
@@ -983,7 +980,7 @@ function App() {
                               </div>
                             </div>
                             <div style={{ display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
-                              <button 
+                              <button
                                 onClick={() => {
                                   setEditingRuleId(rule.id);
                                   setEditForm({ keyword: rule.keyword, replace_with: rule.replace_with, match_type: rule.match_type, color: rule.color || '#5c6ac4' });
@@ -993,12 +990,12 @@ function App() {
                               >
                                 <Edit2 size={16} />
                               </button>
-                              <button 
+                              <button
                                 onClick={async () => {
                                   try {
                                     await fetch(`${API_BASE}/window-rules/${rule.id}`, { method: 'DELETE' });
                                     fetchData();
-                                  } catch(e) {}
+                                  } catch (e) { }
                                 }}
                                 style={{ background: 'none', border: 'none', color: '#f87171', cursor: 'pointer', padding: '0.4rem' }}
                                 title="削除"
@@ -1314,26 +1311,26 @@ function App() {
               <p style={{ fontSize: '0.9rem', color: 'var(--text-muted)', marginBottom: '1.5rem' }}>
                 出力するデータの期間を選択してください。
               </p>
-              
+
               <div className="export-option-card">
                 <div style={{ flex: 1 }}>
                   <div style={{ fontWeight: '600', marginBottom: '0.5rem' }}>期間を指定して出力</div>
                   <div className="modal-date-picker">
-                    <input 
-                      type="date" 
-                      value={exportRange.start} 
+                    <input
+                      type="date"
+                      value={exportRange.start}
                       onChange={e => setExportRange(prev => ({ ...prev, start: e.target.value }))}
                     />
                     <span>～</span>
-                    <input 
-                      type="date" 
-                      value={exportRange.end} 
+                    <input
+                      type="date"
+                      value={exportRange.end}
                       onChange={e => setExportRange(prev => ({ ...prev, end: e.target.value }))}
                     />
                   </div>
                 </div>
-                <button 
-                  className="primary-btn mini" 
+                <button
+                  className="primary-btn mini"
                   onClick={(e) => {
                     e.stopPropagation();
                     handleExportCsv('range');
@@ -1370,12 +1367,12 @@ function App() {
                 <X size={24} />
               </button>
             </div>
-            
+
             <div style={{ flex: 1, overflowY: 'auto', paddingRight: '0.5rem' }}>
               {breakdownLogs.length > 0 ? (
                 <>
                   <div style={{ marginBottom: '2rem', padding: '1rem', background: 'rgba(255,255,255,0.02)', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.05)' }}>
-                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem', flexWrap: 'wrap', gap: '0.5rem' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem', flexWrap: 'wrap', gap: '0.5rem' }}>
                       <h3 style={{ fontSize: '0.9rem', fontWeight: '600', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: '0.5rem', margin: 0 }}>
                         <PieChart size={16} /> {breakdownGroupBy === 'appName' ? 'アプリごとの時間のまとめ' : 'ウィンドウごとの時間のまとめ'}
                       </h3>
@@ -1404,13 +1401,13 @@ function App() {
                               </span>
                             </div>
                             <div style={{ height: '4px', background: 'rgba(255,255,255,0.05)', borderRadius: '2px', overflow: 'hidden' }}>
-                              <div 
-                                style={{ 
-                                  height: '100%', 
-                                  width: `${item.percentage}%`, 
+                              <div
+                                style={{
+                                  height: '100%',
+                                  width: `${item.percentage}%`,
                                   background: 'linear-gradient(90deg, var(--primary), var(--accent))',
                                   borderRadius: '2px'
-                                }} 
+                                }}
                               />
                             </div>
                           </div>
@@ -1452,9 +1449,9 @@ function App() {
                 </div>
               )}
             </div>
-            
+
             <div style={{ marginTop: '1.5rem', paddingTop: '1rem', borderTop: '1px solid rgba(255,255,255,0.05)', textAlign: 'right' }}>
-              <button 
+              <button
                 onClick={() => setIsBreakdownModalOpen(false)}
                 className="primary-btn"
                 style={{ padding: '0.6rem 1.2rem', borderRadius: '8px' }}
