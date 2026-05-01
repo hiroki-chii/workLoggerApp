@@ -56,6 +56,7 @@ try {
   db.prepare('INSERT OR IGNORE INTO settings (key, value) VALUES (?, ?)').run('record_idle', 'true');
   db.prepare('INSERT OR IGNORE INTO settings (key, value) VALUES (?, ?)').run('idle_threshold', '300');
   db.prepare('INSERT OR IGNORE INTO settings (key, value) VALUES (?, ?)').run('default_activity_color', '#6366f1');
+  db.prepare('INSERT OR IGNORE INTO settings (key, value) VALUES (?, ?)').run('idle_display_mode', 'idle');
   console.log('[Server] Database initialized (Better-SQLite3, WAL mode) at: %s', DB_PATH);
 } catch (err) {
   console.error('[Server] Database initialization failed:', err);

@@ -25,10 +25,11 @@ function getSettings() {
     return {
       interval: parseInt(settings.sampling_interval || 30) * 1000,
       recordIdle: settings.record_idle === 'true',
-      idleThreshold: parseInt(settings.idle_threshold || 300)
+      idleThreshold: parseInt(settings.idle_threshold || 300),
+      idleDisplayMode: settings.idle_display_mode || 'idle'
     };
   } catch (err) {
-    return { interval: 30000, recordIdle: false, idleThreshold: 300 };
+    return { interval: 30000, recordIdle: false, idleThreshold: 300, idleDisplayMode: 'idle' };
   }
 }
 
@@ -60,20 +61,21 @@ async function collect() {
         if (result.idleSeconds >= settings.idleThreshold) {
           if (settings.recordIdle) {
             shouldLog = true;
-            logApp = 'アイドル状態';
-            logWindow = 'アイドル状態';
+            if (settings.idleDisplayMode === 'active_window' && result.appName && result.appName !== 'None') {
+              logApp = result.appName;
+              logWindow = result.windowTitle;
+            } else {
+              logApp = 'アイドル状態';
+              logWindow = 'アイドル状態';
+            }
+          } else {
+            // アイドル状態の記録がオフでも、無操作のまま同じウィンドウを長時間開いている場合はそのままアクティブウィンドウとして記録する
+            if (result.appName && result.appName !== 'None') {
+              shouldLog = true;
+            }
           }
         } else if (result.appName && result.appName !== 'None') {
-          // アプリ自身（WorkPulse）の記録を除外
-          const isSelf = 
-            result.appName.toLowerCase().includes('electron') || 
-            result.appName.toLowerCase().includes('pulsework') ||
-            result.appName.toLowerCase().includes('workloggerapp') ||
-            result.windowTitle.includes('WorkPulse');
-
-          if (!isSelf) {
-            shouldLog = true;
-          }
+          shouldLog = true;
         }
 
         if (shouldLog) {

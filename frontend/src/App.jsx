@@ -752,7 +752,7 @@ function App() {
                         <Activity size={20} color="#10b981" />
                         <div>
                           <div style={{ fontWeight: '600' }}>アイドル状態の記録</div>
-                          <div style={{ fontSize: '0.8rem', color: '#94a3b8' }}>操作がない時間を「アイドル状態」として記録します</div>
+                          <div style={{ fontSize: '0.8rem', color: '#94a3b8' }}>操作がない時間について、「アイドル状態」として記録するか、アクティブなウィンドウ名のまま記録するかを選択します</div>
                         </div>
                       </div>
                       <button
@@ -798,6 +798,46 @@ function App() {
                         />
                         <div style={{ fontSize: '0.7rem', color: '#64748b', marginTop: '0.25rem' }}>
                           ※サンプリング間隔（{settings.sampling_interval}秒）以上の値を設定してください
+                        </div>
+
+                        <div style={{ borderTop: '1px solid rgba(255,255,255,0.05)', paddingTop: '1.5rem', marginTop: '1.5rem' }}>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
+                            <span style={{ fontSize: '0.9rem', color: '#94a3b8' }}>無操作時の表示内容</span>
+                          </div>
+                          <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.5rem' }}>
+                            <button
+                              onClick={() => handleSaveSetting('idle_display_mode', 'idle')}
+                              style={{
+                                padding: '0.4rem 0.8rem',
+                                borderRadius: '8px',
+                                border: '1px solid',
+                                borderColor: (settings.idle_display_mode || 'idle') === 'idle' ? '#10b981' : 'rgba(255,255,255,0.1)',
+                                background: (settings.idle_display_mode || 'idle') === 'idle' ? 'rgba(16, 185, 129, 0.2)' : 'transparent',
+                                color: (settings.idle_display_mode || 'idle') === 'idle' ? '#fff' : '#94a3b8',
+                                cursor: 'pointer',
+                                fontSize: '0.8rem',
+                                transition: 'all 0.2s'
+                              }}
+                            >
+                              アイドル状態
+                            </button>
+                            <button
+                              onClick={() => handleSaveSetting('idle_display_mode', 'active_window')}
+                              style={{
+                                padding: '0.4rem 0.8rem',
+                                borderRadius: '8px',
+                                border: '1px solid',
+                                borderColor: settings.idle_display_mode === 'active_window' ? '#10b981' : 'rgba(255,255,255,0.1)',
+                                background: settings.idle_display_mode === 'active_window' ? 'rgba(16, 185, 129, 0.2)' : 'transparent',
+                                color: settings.idle_display_mode === 'active_window' ? '#fff' : '#94a3b8',
+                                cursor: 'pointer',
+                                fontSize: '0.8rem',
+                                transition: 'all 0.2s'
+                              }}
+                            >
+                              アクティブなウィンドウ名
+                            </button>
+                          </div>
                         </div>
                       </div>
                     )}
