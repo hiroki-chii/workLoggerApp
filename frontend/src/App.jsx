@@ -61,10 +61,11 @@ function App() {
   const [exportRange, setExportRange] = useState({ start: today, end: today });
   const [dateRange, setDateRange] = useState({ start: today, end: today });
   const [viewMode, setViewMode] = useState('pie'); // 'pie', 'list'
-  const [groupBy, setGroupBy] = useState('appName'); // 'appName', 'windowTitle'
+  const [groupBy, setGroupBy] = useState('windowTitle'); // 'appName', 'windowTitle'
   const [breakdownLogs, setBreakdownLogs] = useState([]);
   const [selectedSlot, setSelectedSlot] = useState(null);
   const [isBreakdownModalOpen, setIsBreakdownModalOpen] = useState(false);
+  const [breakdownGroupBy, setBreakdownGroupBy] = useState('windowTitle'); // 'appName', 'windowTitle'
 
   const [windowRules, setWindowRules] = useState([]);
   const [editingRuleId, setEditingRuleId] = useState(null);
@@ -345,9 +346,15 @@ function App() {
     
     const summaryMap = {};
     breakdownLogs.forEach(log => {
-      const key = log.appName;
+      const key = breakdownGroupBy === 'appName' ? log.appName : log.displayTitle;
       if (!summaryMap[key]) {
-        summaryMap[key] = { count: 0, appName: log.appName };
+        summaryMap[key] = {
+          count: 0,
+          name: key,
+          isReplaced: breakdownGroupBy === 'windowTitle' ? log.isReplaced : false,
+          color: breakdownGroupBy === 'windowTitle' ? log.color : null,
+          originalTitle: breakdownGroupBy === 'windowTitle' ? log.originalTitle : null
+        };
       }
       summaryMap[key].count++;
     });
@@ -514,8 +521,8 @@ function App() {
                     </div>
                     <div style={{ display: 'flex', gap: '1rem', alignItems: 'center', flexWrap: 'nowrap' }}>
                       <div className="toggle-group">
-                        <button className={groupBy === 'appName' ? 'active' : ''} onClick={() => setGroupBy('appName')}>アプリ</button>
                         <button className={groupBy === 'windowTitle' ? 'active' : ''} onClick={() => setGroupBy('windowTitle')}>ウィンドウ</button>
+                        <button className={groupBy === 'appName' ? 'active' : ''} onClick={() => setGroupBy('appName')}>アプリ</button>
                       </div>
                       <div className="view-mode-toggle">
                         <button className={viewMode === 'pie' ? 'active' : ''} onClick={() => setViewMode('pie')} title="円グラフ"><PieChart size={16} /></button>
@@ -1399,15 +1406,30 @@ function App() {
               {breakdownLogs.length > 0 ? (
                 <>
                   <div style={{ marginBottom: '2rem', padding: '1rem', background: 'rgba(255,255,255,0.02)', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.05)' }}>
-                    <h3 style={{ fontSize: '0.9rem', fontWeight: '600', marginBottom: '1rem', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                      <PieChart size={16} /> 作業割合の要約
-                    </h3>
+                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem', flexWrap: 'wrap', gap: '0.5rem' }}>
+                      <h3 style={{ fontSize: '0.9rem', fontWeight: '600', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: '0.5rem', margin: 0 }}>
+                        <PieChart size={16} /> {breakdownGroupBy === 'appName' ? 'アプリ使用割合の要約' : 'ウィンドウ使用割合の要約'}
+                      </h3>
+                      <div className="toggle-group" style={{ display: 'inline-flex' }}>
+                        <button className={breakdownGroupBy === 'windowTitle' ? 'active' : ''} onClick={() => setBreakdownGroupBy('windowTitle')}>ウィンドウ</button>
+                        <button className={breakdownGroupBy === 'appName' ? 'active' : ''} onClick={() => setBreakdownGroupBy('appName')}>アプリ</button>
+                      </div>
+                    </div>
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
                       {getBreakdownSummary().map((item, idx) => (
                         <div key={idx} style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
                           <div style={{ flex: 1, minWidth: 0 }}>
                             <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.25rem', fontSize: '0.85rem' }}>
-                              <span style={{ fontWeight: '500', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{item.appName}</span>
+                              <span style={{ fontWeight: '500', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '350px', display: 'inline-block' }}>
+                                {breakdownGroupBy === 'windowTitle' && item.isReplaced ? (
+                                  <>
+                                    <span style={{ color: item.color || 'var(--primary)', fontWeight: '600', marginRight: '8px' }}>{item.name}</span>
+                                    <span style={{ color: '#94a3b8', fontSize: '0.85em' }} title={item.originalTitle}>({item.originalTitle})</span>
+                                  </>
+                                ) : (
+                                  <span title={item.name}>{item.name}</span>
+                                )}
+                              </span>
                               <span style={{ color: 'var(--primary)', fontWeight: '600' }}>
                                 {item.percentage}% ({item.duration >= 60 ? `${Math.floor(item.duration / 60)}分${item.duration % 60}秒` : `${item.duration}秒`})
                               </span>
