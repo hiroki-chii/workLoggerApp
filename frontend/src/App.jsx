@@ -24,7 +24,8 @@ import {
   ChevronRight,
   Menu,
   HelpCircle,
-  X
+  X,
+  Edit2
 } from 'lucide-react';
 import {
   Chart as ChartJS,
@@ -66,6 +67,8 @@ function App() {
   const [isBreakdownModalOpen, setIsBreakdownModalOpen] = useState(false);
 
   const [windowRules, setWindowRules] = useState([]);
+  const [editingRuleId, setEditingRuleId] = useState(null);
+  const [editForm, setEditForm] = useState({ keyword: '', replace_with: '', match_type: 'contains', color: '#5c6ac4' });
 
   // ウィンドウ名置換ルールの適用関数
   const applyWindowRules = (title, rules = windowRules) => {
@@ -880,33 +883,134 @@ function App() {
 
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
                       {windowRules.map(rule => (
-                        <div key={rule.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0.75rem', background: 'rgba(0,0,0,0.2)', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.05)' }}>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', overflow: 'hidden' }}>
-                            <div style={{ padding: '0.2rem 0.5rem', fontSize: '0.75rem', background: 'rgba(139, 92, 246, 0.2)', color: '#a78bfa', borderRadius: '4px', whiteSpace: 'nowrap' }}>
-                              {rule.match_type === 'exact' ? '完全一致' : rule.match_type === 'startsWith' ? '前方一致' : '部分一致'}
-                            </div>
-                            <div style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', color: '#94a3b8' }}>
-                              <span style={{ color: 'var(--text)' }}>{rule.keyword}</span>
-                            </div>
-                            <div style={{ color: '#64748b' }}>→</div>
-                            <div style={{ fontWeight: '500', color: rule.color || 'var(--primary)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                              {rule.replace_with}
+                        editingRuleId === rule.id ? (
+                          <div 
+                            key={rule.id} 
+                            style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', padding: '0.75rem', background: 'rgba(0,0,0,0.2)', borderRadius: '8px', border: '1px solid #6366f1', flexWrap: 'wrap' }}
+                            onKeyDown={async (e) => {
+                              if (e.key === 'Escape') {
+                                setEditingRuleId(null);
+                              } else if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
+                                if (!editForm.keyword || !editForm.replace_with) return alert('キーワードと置換後の名前を入力してください');
+                                try {
+                                  const res = await fetch(`${API_BASE}/window-rules/${rule.id}`, {
+                                    method: 'PUT',
+                                    headers: { 'Content-Type': 'application/json' },
+                                    body: JSON.stringify(editForm)
+                                  });
+                                  if (res.ok) {
+                                    setEditingRuleId(null);
+                                    await fetchWindowRules();
+                                    fetchData();
+                                  }
+                                } catch (err) {
+                                  console.error(err);
+                                }
+                              }
+                            }}
+                          >
+                            <input 
+                              type="text" 
+                              value={editForm.keyword}
+                              onChange={(e) => setEditForm({...editForm, keyword: e.target.value})}
+                              style={{ flex: 1, minWidth: '150px', padding: '0.4rem', borderRadius: '4px', border: '1px solid rgba(255,255,255,0.2)', background: 'rgba(0,0,0,0.3)', color: 'var(--text)', fontSize: '0.85rem' }}
+                            />
+                            <select 
+                              value={editForm.match_type}
+                              onChange={(e) => setEditForm({...editForm, match_type: e.target.value})}
+                              style={{ padding: '0.4rem', borderRadius: '4px', border: '1px solid rgba(255,255,255,0.2)', background: 'rgba(0,0,0,0.3)', color: 'var(--text)', fontSize: '0.85rem' }}
+                            >
+                              <option value="contains">部分一致</option>
+                              <option value="startsWith">前方一致</option>
+                              <option value="exact">完全一致</option>
+                            </select>
+                            <span style={{ color: '#64748b' }}>→</span>
+                            <input 
+                              type="text" 
+                              value={editForm.replace_with}
+                              onChange={(e) => setEditForm({...editForm, replace_with: e.target.value})}
+                              style={{ flex: 1, minWidth: '150px', padding: '0.4rem', borderRadius: '4px', border: '1px solid rgba(255,255,255,0.2)', background: 'rgba(0,0,0,0.3)', color: 'var(--text)', fontSize: '0.85rem' }}
+                            />
+                            <input 
+                              type="color" 
+                              value={editForm.color || '#5c6ac4'}
+                              onChange={(e) => setEditForm({...editForm, color: e.target.value})}
+                              style={{ width: '32px', height: '32px', padding: '0', border: 'none', background: 'transparent', cursor: 'pointer', flexShrink: 0 }}
+                            />
+                            <div style={{ display: 'flex', gap: '0.4rem' }}>
+                              <button 
+                                onClick={async () => {
+                                  if (!editForm.keyword || !editForm.replace_with) return alert('キーワードと置換後の名前を入力してください');
+                                  try {
+                                    const res = await fetch(`${API_BASE}/window-rules/${rule.id}`, {
+                                      method: 'PUT',
+                                      headers: { 'Content-Type': 'application/json' },
+                                      body: JSON.stringify(editForm)
+                                    });
+                                    if (res.ok) {
+                                      setEditingRuleId(null);
+                                      await fetchWindowRules();
+                                      fetchData();
+                                    }
+                                  } catch (e) {
+                                    console.error(e);
+                                  }
+                                }}
+                                style={{ padding: '0.4rem 0.8rem', borderRadius: '4px', background: '#10b981', color: '#fff', border: 'none', cursor: 'pointer', fontSize: '0.8rem', fontWeight: '500' }}
+                                title="保存 (Ctrl + Enter)"
+                              >
+                                保存
+                              </button>
+                              <button 
+                                onClick={() => setEditingRuleId(null)}
+                                style={{ padding: '0.4rem 0.8rem', borderRadius: '4px', background: '#475569', color: '#fff', border: 'none', cursor: 'pointer', fontSize: '0.8rem', fontWeight: '500' }}
+                                title="取消 (Esc)"
+                              >
+                                取消
+                              </button>
                             </div>
                           </div>
-                          <button 
-                            onClick={async () => {
-                              try {
-                                await fetch(`${API_BASE}/window-rules/${rule.id}`, { method: 'DELETE' });
-                                await fetchWindowRules();
-                                fetchData();
-                              } catch(e) {}
-                            }}
-                            style={{ background: 'none', border: 'none', color: '#f87171', cursor: 'pointer', padding: '0.2rem' }}
-                            title="削除"
-                          >
-                            <Trash2 size={16} />
-                          </button>
-                        </div>
+                        ) : (
+                          <div key={rule.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0.75rem', background: 'rgba(0,0,0,0.2)', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.05)' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', overflow: 'hidden' }}>
+                              <div style={{ padding: '0.2rem 0.5rem', fontSize: '0.75rem', background: 'rgba(139, 92, 246, 0.2)', color: '#a78bfa', borderRadius: '4px', whiteSpace: 'nowrap' }}>
+                                {rule.match_type === 'exact' ? '完全一致' : rule.match_type === 'startsWith' ? '前方一致' : '部分一致'}
+                              </div>
+                              <div style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', color: '#94a3b8' }}>
+                                <span style={{ color: 'var(--text)' }}>{rule.keyword}</span>
+                              </div>
+                              <div style={{ color: '#64748b' }}>→</div>
+                              <div style={{ fontWeight: '500', color: rule.color || 'var(--primary)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                                {rule.replace_with}
+                              </div>
+                            </div>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
+                              <button 
+                                onClick={() => {
+                                  setEditingRuleId(rule.id);
+                                  setEditForm({ keyword: rule.keyword, replace_with: rule.replace_with, match_type: rule.match_type, color: rule.color || '#5c6ac4' });
+                                }}
+                                style={{ background: 'none', border: 'none', color: '#a78bfa', cursor: 'pointer', padding: '0.4rem' }}
+                                title="編集"
+                              >
+                                <Edit2 size={16} />
+                              </button>
+                              <button 
+                                onClick={async () => {
+                                  try {
+                                    await fetch(`${API_BASE}/window-rules/${rule.id}`, { method: 'DELETE' });
+                                    await fetchWindowRules();
+                                    fetchData();
+                                  } catch(e) {}
+                                }}
+                                style={{ background: 'none', border: 'none', color: '#f87171', cursor: 'pointer', padding: '0.4rem' }}
+                                title="削除"
+                              >
+                                <Trash2 size={16} />
+                              </button>
+                            </div>
+                          </div>
+                        )
                       ))}
                       {windowRules.length === 0 && (
                         <div style={{ textAlign: 'center', padding: '1rem', color: '#64748b', fontSize: '0.85rem' }}>

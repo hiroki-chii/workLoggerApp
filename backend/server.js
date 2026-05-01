@@ -212,6 +212,20 @@ app.post('/api/window-rules', (req, res) => {
   }
 });
 
+app.put('/api/window-rules/:id', (req, res) => {
+  try {
+    const { id } = req.params;
+    const { keyword, replace_with, match_type, color } = req.body;
+    if (!keyword || !replace_with || !match_type) {
+      return res.status(400).json({ error: 'Missing required fields' });
+    }
+    db.prepare('UPDATE window_rules SET keyword = ?, replace_with = ?, match_type = ?, color = ? WHERE id = ?').run(keyword, replace_with, match_type, color || null, id);
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 app.delete('/api/window-rules/:id', (req, res) => {
   try {
     const { id } = req.params;
