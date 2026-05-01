@@ -101,6 +101,33 @@ app.get('/api/logs', (req, res) => {
   }
 });
 
+app.get('/api/logs/breakdown', (req, res) => {
+  try {
+    const { date, hour, minute } = req.query;
+    if (!date || hour === undefined || minute === undefined) {
+      return res.status(400).json({ error: 'Missing date, hour, or minute' });
+    }
+
+    // hour と minute を2桁の文字列に整形
+    const hStr = hour.toString().padStart(2, '0');
+    const mStart = parseInt(minute);
+    
+    const query = `
+      SELECT id, appName, windowTitle, datetime(timestamp, 'localtime') as timestamp 
+      FROM logs
+      WHERE date(timestamp, 'localtime') = ?
+        AND strftime('%H', timestamp, 'localtime') = ?
+        AND (strftime('%M', timestamp, 'localtime') / 15) * 15 = ?
+      ORDER BY timestamp ASC
+    `;
+    const logs = db.prepare(query).all(date, hStr, mStart);
+    res.json(logs);
+  } catch (err) {
+    console.error('[Server] Breakdown error:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
 app.delete('/api/logs/clear', (req, res) => {
   try {
     const result = db.prepare('DELETE FROM logs').run();

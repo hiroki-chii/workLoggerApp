@@ -138,6 +138,20 @@ body {
   font-weight: 700;
 }
 
+.breakdown-modal {
+  max-width: 800px !important;
+  width: 90% !important;
+  max-height: 85vh !important;
+  padding: 1.5rem !important;
+}
+
+.breakdown-modal .logs-table th {
+  position: sticky;
+  top: 0;
+  background: var(--bg-dark);
+  z-index: 10;
+}
+
 .close-btn {
   background: transparent;
   border: none;

@@ -23,7 +23,8 @@ import {
   ChevronLeft,
   ChevronRight,
   Menu,
-  HelpCircle
+  HelpCircle,
+  X
 } from 'lucide-react';
 import {
   Chart as ChartJS,
@@ -60,6 +61,9 @@ function App() {
   const [dateRange, setDateRange] = useState({ start: today, end: today });
   const [viewMode, setViewMode] = useState('pie'); // 'pie', 'list'
   const [groupBy, setGroupBy] = useState('appName'); // 'appName', 'windowTitle'
+  const [breakdownLogs, setBreakdownLogs] = useState([]);
+  const [selectedSlot, setSelectedSlot] = useState(null);
+  const [isBreakdownModalOpen, setIsBreakdownModalOpen] = useState(false);
 
   // エイリアスリストのみ取得する軽量関数
   const fetchAliases = async () => {
@@ -259,6 +263,46 @@ function App() {
   };
 
   // Alias handlers removed
+  
+  const handleCellClick = async (date, hour, minute) => {
+    setSelectedSlot({ date, hour, minute });
+    setIsBreakdownModalOpen(true);
+    setBreakdownLogs([]); // Reset previous logs
+    
+    try {
+      const res = await fetch(`${API_BASE}/logs/breakdown?date=${date}&hour=${hour}&minute=${minute}`);
+      if (res.ok) {
+        const data = await res.json();
+        setBreakdownLogs(data);
+      }
+    } catch (err) {
+      console.error('内訳の取得に失敗しました:', err);
+    }
+  };
+
+  const getBreakdownSummary = () => {
+    if (!breakdownLogs.length) return [];
+    
+    const summaryMap = {};
+    breakdownLogs.forEach(log => {
+      const key = log.appName;
+      if (!summaryMap[key]) {
+        summaryMap[key] = { count: 0, appName: log.appName };
+      }
+      summaryMap[key].count++;
+    });
+
+    const total = breakdownLogs.length;
+    const interval = parseInt(settings.sampling_interval || 30);
+
+    return Object.values(summaryMap)
+      .map(item => ({
+        ...item,
+        percentage: Math.round((item.count / total) * 100),
+        duration: Math.round((item.count * interval)) // 秒単位で計算
+      }))
+      .sort((a, b) => b.count - a.count);
+  };
 
 
   const pieData = {
@@ -530,9 +574,11 @@ function App() {
                             className={`timetable-cell ${m === '00' ? 'is-hour-start' : ''} ${new Date(date).getDay() === 0 ? 'is-sunday' : new Date(date).getDay() === 6 ? 'is-saturday' : ''}`}
                             style={{
                               backgroundColor: (cell && !isIdle) ? cellColor : undefined,
-                              border: (cell && !isIdle) ? 'none' : undefined
+                              border: (cell && !isIdle) ? 'none' : undefined,
+                              cursor: cell ? 'pointer' : 'default'
                             }}
-                            title={cell ? `${date} ${h}:${m}\nアプリ: ${cell.topApp}\nウィンドウ: ${cell.topWindow}\nサンプリング数: ${cell.count} samples` : undefined}
+                            onClick={() => cell && handleCellClick(date, h, m)}
+                            title={cell ? `${date} ${h}:${m}\nアプリ: ${cell.topApp}\nウィンドウ: ${cell.topWindow}\nサンプリング数: ${cell.count} samples\n(クリックで内訳を表示)` : undefined}
                           />
                         );
                       })}
@@ -1031,6 +1077,102 @@ function App() {
                 </div>
                 <button className="primary-btn mini secondary"><Download size={14} /> 出力</button>
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+      {isBreakdownModalOpen && (
+        <div className="modal-overlay" onClick={() => setIsBreakdownModalOpen(false)}>
+          <div className="modal-content breakdown-modal" onClick={e => e.stopPropagation()} style={{ maxWidth: '700px', maxHeight: '80vh', display: 'flex', flexDirection: 'column' }}>
+            <div className="modal-header" style={{ borderBottom: '1px solid rgba(255,255,255,0.05)', paddingBottom: '1rem', marginBottom: '1rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <div>
+                <h2 style={{ fontSize: '1.2rem', fontWeight: '700', color: 'var(--text)' }}>
+                  ログの内訳
+                </h2>
+                <div style={{ fontSize: '0.85rem', color: '#94a3b8', marginTop: '0.2rem' }}>
+                  {selectedSlot?.date} {selectedSlot?.hour}:{selectedSlot?.minute} (15分間)
+                </div>
+              </div>
+              <button onClick={() => setIsBreakdownModalOpen(false)} className="close-btn" style={{ background: 'none', border: 'none', color: '#94a3b8', cursor: 'pointer' }}>
+                <X size={24} />
+              </button>
+            </div>
+            
+            <div style={{ flex: 1, overflowY: 'auto', paddingRight: '0.5rem' }}>
+              {breakdownLogs.length > 0 ? (
+                <>
+                  <div style={{ marginBottom: '2rem', padding: '1rem', background: 'rgba(255,255,255,0.02)', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.05)' }}>
+                    <h3 style={{ fontSize: '0.9rem', fontWeight: '600', marginBottom: '1rem', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                      <PieChart size={16} /> 作業割合の要約
+                    </h3>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+                      {getBreakdownSummary().map((item, idx) => (
+                        <div key={idx} style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+                          <div style={{ flex: 1, minWidth: 0 }}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.25rem', fontSize: '0.85rem' }}>
+                              <span style={{ fontWeight: '500', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{item.appName}</span>
+                              <span style={{ color: 'var(--primary)', fontWeight: '600' }}>
+                                {item.percentage}% ({item.duration >= 60 ? `${Math.floor(item.duration / 60)}分${item.duration % 60}秒` : `${item.duration}秒`})
+                              </span>
+                            </div>
+                            <div style={{ height: '4px', background: 'rgba(255,255,255,0.05)', borderRadius: '2px', overflow: 'hidden' }}>
+                              <div 
+                                style={{ 
+                                  height: '100%', 
+                                  width: `${item.percentage}%`, 
+                                  background: 'linear-gradient(90deg, var(--primary), var(--accent))',
+                                  borderRadius: '2px'
+                                }} 
+                              />
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  <h3 style={{ fontSize: '0.9rem', fontWeight: '600', marginBottom: '0.5rem', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                    <List size={16} /> 詳細ログ
+                  </h3>
+                  <table className="logs-table" style={{ width: '100%' }}>
+                    <thead>
+                      <tr>
+                        <th style={{ textAlign: 'left', padding: '0.75rem' }}>時刻</th>
+                        <th style={{ textAlign: 'left', padding: '0.75rem' }}>アプリ</th>
+                        <th style={{ textAlign: 'left', padding: '0.75rem' }}>ウィンドウタイトル</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {breakdownLogs.map((log) => (
+                        <tr key={log.id} style={{ borderBottom: '1px solid rgba(255,255,255,0.02)' }}>
+                          <td className="timestamp" style={{ whiteSpace: 'nowrap', padding: '0.75rem' }}>
+                            {new Date(log.timestamp).toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
+                          </td>
+                          <td style={{ padding: '0.75rem' }}><span className="app-badge">{log.appName}</span></td>
+                          <td style={{ padding: '0.75rem', maxWidth: '300px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={log.windowTitle}>
+                            {log.windowTitle}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </>
+              ) : (
+                <div style={{ padding: '3rem', textAlign: 'center', color: '#94a3b8' }}>
+                  <RefreshCw size={24} className="spin" style={{ marginBottom: '1rem' }} />
+                  <div>データを読み込み中...</div>
+                </div>
+              )}
+            </div>
+            
+            <div style={{ marginTop: '1.5rem', paddingTop: '1rem', borderTop: '1px solid rgba(255,255,255,0.05)', textAlign: 'right' }}>
+              <button 
+                onClick={() => setIsBreakdownModalOpen(false)}
+                className="primary-btn"
+                style={{ padding: '0.6rem 1.2rem', borderRadius: '8px' }}
+              >
+                閉じる
+              </button>
             </div>
           </div>
         </div>
