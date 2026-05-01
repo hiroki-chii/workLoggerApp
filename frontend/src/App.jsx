@@ -492,7 +492,7 @@ function App() {
       case 'dashboard':
         return (
           <>
-            {renderDateHeader('アクティビティ概要')}
+            {renderDateHeader('作業状況のまとめ')}
 
             <div style={{ flex: 1, overflowY: 'auto', paddingRight: '0.5rem', marginTop: '1rem' }}>
               {error && (
@@ -517,7 +517,7 @@ function App() {
                 <div className="card">
                   <div className="card-title" style={{ display: 'flex', justifyContent: 'space-between', flexWrap: 'wrap', gap: '1rem', height: 'auto', minHeight: '1.5rem' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', whiteSpace: 'nowrap' }}>
-                      <PieChart size={20} /> {groupBy === 'appName' ? 'アプリ使用分布' : 'ウィンドウ使用分布'}
+                      <PieChart size={20} /> {groupBy === 'windowTitle' ? 'ウィンドウごとの時間' : 'アプリごとの時間'}
                     </div>
                     <div style={{ display: 'flex', gap: '1rem', alignItems: 'center', flexWrap: 'nowrap' }}>
                       <div className="toggle-group">
@@ -537,20 +537,20 @@ function App() {
 
                 <div className="card">
                   <div className="card-title">
-                    <Clock size={20} /> サマリー
+                    <Clock size={20} /> 現在の状況
                   </div>
                   <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
                     <div style={{ padding: '1.5rem', background: 'rgba(99, 102, 241, 0.1)', borderRadius: '16px' }}>
-                      <div style={{ fontSize: '0.8rem', color: '#94a3b8' }}>総サンプル数</div>
+                      <div style={{ fontSize: '0.8rem', color: '#94a3b8' }}>合計の記録回数</div>
                       <div style={{ fontSize: '2rem', fontWeight: '800' }}>{stats.reduce((acc, curr) => acc + curr.count, 0)}</div>
                     </div>
                     <div style={{ padding: '1.5rem', background: 'rgba(34, 211, 238, 0.1)', borderRadius: '16px' }}>
-                      <div style={{ fontSize: '0.8rem', color: '#94a3b8' }}>検知アプリ数</div>
+                      <div style={{ fontSize: '0.8rem', color: '#94a3b8' }}>使われたアプリの数</div>
                       <div style={{ fontSize: '2rem', fontWeight: '800' }}>{stats.length}</div>
                     </div>
                   </div>
                   <div style={{ marginTop: '1.5rem', padding: '1rem', borderTop: '1px solid rgba(255,255,255,0.05)' }}>
-                    <span style={{ color: '#94a3b8', fontSize: '0.85rem' }}>次のサンプリングまで 約{settings.sampling_interval}秒</span>
+                    <span style={{ color: '#94a3b8', fontSize: '0.85rem' }}>次の記録まで 約{settings.sampling_interval}秒</span>
                   </div>
                 </div>
               </section>
@@ -578,7 +578,7 @@ function App() {
 
         return (
           <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
-            {renderDateHeader('タイムテーブル分析')}
+            {renderDateHeader('時間ごとの活動の記録')}
             <section className="card fade-in" style={{ flex: 1, marginTop: '1rem', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
               <div className="card-title" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
@@ -610,18 +610,20 @@ function App() {
                   <div className="time-label-header sticky-header sticky-left"></div>
                   {dates.map(d => {
                     const dateObj = new Date(d);
-                    const yy = dateObj.getFullYear().toString().slice(-2);
+                    const yyyy = dateObj.getFullYear();
                     const mm = (dateObj.getMonth() + 1).toString().padStart(2, '0');
                     const dd = dateObj.getDate().toString().padStart(2, '0');
                     const dayName = ['日', '月', '火', '水', '木', '金', '土'][dateObj.getDay()];
                     const dayType = dateObj.getDay() === 0 ? 'is-sunday' : dateObj.getDay() === 6 ? 'is-saturday' : '';
 
                     return (
-                      <div key={d} className={`day-label sticky-header ${dayType}`}>
-                        {`${yy}/${mm}/${dd}(${dayName})`}
+                      <div key={d} className={`day-label sticky-header ${dayType}`} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', lineHeight: '1.2', padding: '0.25rem 0' }}>
+                        <div style={{ fontSize: '0.7rem', opacity: 0.7, fontWeight: 'normal' }}>{yyyy}</div>
+                        <div style={{ fontSize: '0.8rem', fontWeight: '700' }}>{`${mm}/${dd}(${dayName})`}</div>
                       </div>
                     );
                   })}
+
 
                   {intervals.map(({ h, m }) => (
                     <React.Fragment key={`${h}:${m}`}>
@@ -660,12 +662,12 @@ function App() {
       case 'history':
         return (
           <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
-            {renderDateHeader('アクティビティ履歴')}
+            {renderDateHeader('これまでの作業履歴')}
             <div style={{ flex: 1, overflowY: 'auto', marginTop: '1rem' }}>
               <section className="card fade-in">
                 <div className="card-title" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                    <History size={20} /> 最近のアクティビティ履歴
+                    <History size={20} /> 最近の作業履歴
                   </div>
                 </div>
                 <div className="logs-table-container">
@@ -713,8 +715,8 @@ function App() {
 
                     <div style={{ marginBottom: '1.5rem', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                       <div>
-                        <div style={{ fontSize: '0.9rem', fontWeight: '500' }}>サンプリング間隔</div>
-                        <div style={{ fontSize: '0.8rem', color: '#94a3b8' }}>データの収集頻度を設定します</div>
+                        <div style={{ fontSize: '0.9rem', fontWeight: '500' }}>記録する間隔（秒）</div>
+                        <div style={{ fontSize: '0.8rem', color: '#94a3b8' }}>どのくらいの頻度で作業状況を記録するかを設定します</div>
                       </div>
                       <div style={{ display: 'flex', gap: '0.5rem' }}>
                         {[10, 30, 60].map((interval) => (
@@ -741,8 +743,8 @@ function App() {
 
                     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                       <div>
-                        <div style={{ fontSize: '0.9rem', fontWeight: '500' }}>デフォルトカラー</div>
-                        <div style={{ fontSize: '0.8rem', color: '#94a3b8' }}>エイリアス未設定時の表示色</div>
+                        <div style={{ fontSize: '0.9rem', fontWeight: '500' }}>標準の色</div>
+                        <div style={{ fontSize: '0.8rem', color: '#94a3b8' }}>表示名変更のルールがないときの色</div>
                       </div>
                       <input
                         type="color"
@@ -758,8 +760,8 @@ function App() {
                       <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
                         <Activity size={20} color="#10b981" />
                         <div>
-                          <div style={{ fontWeight: '600' }}>アイドル状態の記録</div>
-                          <div style={{ fontSize: '0.8rem', color: '#94a3b8' }}>操作がない時間について、「アイドル状態」として記録するか、アクティブなウィンドウ名のまま記録するかを選択します</div>
+                          <div style={{ fontWeight: '600' }}>操作していない時間の記録</div>
+                          <div style={{ fontSize: '0.8rem', color: '#94a3b8' }}>操作がない時間について、「操作していない時間」として記録するか、開いていたウィンドウ名のまま記録するかを選択します</div>
                         </div>
                       </div>
                       <button
@@ -791,7 +793,7 @@ function App() {
                     {settings.record_idle === 'true' && (
                       <div style={{ borderTop: '1px solid rgba(255,255,255,0.05)', paddingTop: '1.5rem' }}>
                         <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
-                          <span style={{ fontSize: '0.9rem', color: '#94a3b8' }}>アイドル判定しきい値</span>
+                          <span style={{ fontSize: '0.9rem', color: '#94a3b8' }}>操作していないとみなす時間</span>
                           <span style={{ fontWeight: '600' }}>{settings.idle_threshold || 300}秒</span>
                         </div>
                         <input
@@ -804,12 +806,12 @@ function App() {
                           style={{ width: '100%', accentColor: '#10b981' }}
                         />
                         <div style={{ fontSize: '0.7rem', color: '#64748b', marginTop: '0.25rem' }}>
-                          ※サンプリング間隔（{settings.sampling_interval}秒）以上の値を設定してください
+                          ※記録する間隔（{settings.sampling_interval}秒）以上の値を設定してください
                         </div>
 
                         <div style={{ borderTop: '1px solid rgba(255,255,255,0.05)', paddingTop: '1.5rem', marginTop: '1.5rem' }}>
                           <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
-                            <span style={{ fontSize: '0.9rem', color: '#94a3b8' }}>無操作時の表示内容</span>
+                            <span style={{ fontSize: '0.9rem', color: '#94a3b8' }}>操作していないときの表示内容</span>
                           </div>
                           <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.5rem' }}>
                             <button
@@ -826,7 +828,7 @@ function App() {
                                 transition: 'all 0.2s'
                               }}
                             >
-                              アイドル状態
+                              操作していない
                             </button>
                             <button
                               onClick={() => handleSaveSetting('idle_display_mode', 'active_window')}
@@ -842,7 +844,7 @@ function App() {
                                 transition: 'all 0.2s'
                               }}
                             >
-                              アクティブなウィンドウ名
+                              開いているウィンドウの名前
                             </button>
                           </div>
                         </div>
@@ -855,8 +857,8 @@ function App() {
                     <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '1.5rem' }}>
                       <Settings size={20} color="#8b5cf6" />
                       <div>
-                        <div style={{ fontWeight: '600' }}>表示名置換ルール</div>
-                        <div style={{ fontSize: '0.8rem', color: '#94a3b8' }}>特定のウィンドウ名を、管理しやすい名前に置き換えて表示します。</div>
+                        <div style={{ fontWeight: '600' }}>表示名の変更ルール</div>
+                        <div style={{ fontSize: '0.8rem', color: '#94a3b8' }}>特定のウィンドウ名を、分かりやすい名前に変更して表示します。</div>
                       </div>
                     </div>
 
@@ -874,14 +876,14 @@ function App() {
                         style={{ flex: 1, padding: '0.5rem', borderRadius: '6px', border: '1px solid rgba(255,255,255,0.1)', background: 'rgba(0,0,0,0.2)', color: 'var(--text)' }}
                       />
                       <select id="newRuleMatchType" style={{ padding: '0.5rem', borderRadius: '6px', border: '1px solid rgba(255,255,255,0.1)', background: 'rgba(0,0,0,0.2)', color: 'var(--text)' }}>
-                        <option value="contains">部分一致</option>
-                        <option value="startsWith">前方一致</option>
-                        <option value="exact">完全一致</option>
+                        <option value="contains">を含む</option>
+                        <option value="startsWith">から始まる</option>
+                        <option value="exact">と同じ</option>
                       </select>
                       <input 
                         type="text" 
                         id="newRuleReplace"
-                        placeholder="置換後の名前 (例: ブラウザ)" 
+                        placeholder="変更後の名前 (例: ブラウザ)" 
                         style={{ flex: 1, padding: '0.5rem', borderRadius: '6px', border: '1px solid rgba(255,255,255,0.1)', background: 'rgba(0,0,0,0.2)', color: 'var(--text)' }}
                       />
                       <input 
@@ -897,7 +899,7 @@ function App() {
                           const replace_with = document.getElementById('newRuleReplace').value;
                           const match_type = document.getElementById('newRuleMatchType').value;
                           const color = document.getElementById('newRuleColor').value;
-                          if (!keyword || !replace_with) return alert('キーワードと置換後の名前を入力してください');
+                          if (!keyword || !replace_with) return alert('キーワードと変更後の名前を入力してください');
                           
                           try {
                             const res = await fetch(`${API_BASE}/window-rules`, {
@@ -930,7 +932,7 @@ function App() {
                               if (e.key === 'Escape') {
                                 setEditingRuleId(null);
                               } else if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
-                                if (!editForm.keyword || !editForm.replace_with) return alert('キーワードと置換後の名前を入力してください');
+                                if (!editForm.keyword || !editForm.replace_with) return alert('キーワードと変更後の名前を入力してください');
                                 try {
                                   const res = await fetch(`${API_BASE}/window-rules/${rule.id}`, {
                                     method: 'PUT',
@@ -958,9 +960,9 @@ function App() {
                               onChange={(e) => setEditForm({...editForm, match_type: e.target.value})}
                               style={{ padding: '0.4rem', borderRadius: '4px', border: '1px solid rgba(255,255,255,0.2)', background: 'rgba(0,0,0,0.3)', color: 'var(--text)', fontSize: '0.85rem' }}
                             >
-                              <option value="contains">部分一致</option>
-                              <option value="startsWith">前方一致</option>
-                              <option value="exact">完全一致</option>
+                              <option value="contains">を含む</option>
+                              <option value="startsWith">から始まる</option>
+                              <option value="exact">と同じ</option>
                             </select>
                             <span style={{ color: '#64748b' }}>→</span>
                             <input 
@@ -978,7 +980,7 @@ function App() {
                             <div style={{ display: 'flex', gap: '0.4rem' }}>
                               <button 
                                 onClick={async () => {
-                                  if (!editForm.keyword || !editForm.replace_with) return alert('キーワードと置換後の名前を入力してください');
+                                  if (!editForm.keyword || !editForm.replace_with) return alert('キーワードと変更後の名前を入力してください');
                                   try {
                                     const res = await fetch(`${API_BASE}/window-rules/${rule.id}`, {
                                       method: 'PUT',
@@ -1011,7 +1013,7 @@ function App() {
                           <div key={rule.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0.75rem', background: 'rgba(0,0,0,0.2)', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.05)' }}>
                             <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', overflow: 'hidden' }}>
                               <div style={{ padding: '0.2rem 0.5rem', fontSize: '0.75rem', background: 'rgba(139, 92, 246, 0.2)', color: '#a78bfa', borderRadius: '4px', whiteSpace: 'nowrap' }}>
-                                {rule.match_type === 'exact' ? '完全一致' : rule.match_type === 'startsWith' ? '前方一致' : '部分一致'}
+                                {rule.match_type === 'exact' ? 'と同じ' : rule.match_type === 'startsWith' ? 'から始まる' : 'を含む'}
                               </div>
                               <div style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', color: '#94a3b8' }}>
                                 <span style={{ color: 'var(--text)' }}>{rule.keyword}</span>
@@ -1060,10 +1062,10 @@ function App() {
                   <div style={{ marginBottom: '2rem', padding: '1.5rem', background: 'rgba(239, 68, 68, 0.05)', border: '1px solid rgba(239, 68, 68, 0.1)', borderRadius: '16px' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '1rem', color: '#f87171' }}>
                       <AlertTriangle size={20} />
-                      <span style={{ fontWeight: '600' }}>危険な操作</span>
+                      <span style={{ fontWeight: '600' }}>記録の削除</span>
                     </div>
                     <p style={{ color: '#94a3b8', fontSize: '0.9rem', marginBottom: '1.5rem' }}>
-                      これまでに記録されたすべてのアクティビティログを永久に削除します。
+                      これまでに記録されたすべての作業履歴を完全に削除します。
                     </p>
                     <button
                       onClick={handleClearLogs}
@@ -1111,28 +1113,32 @@ function App() {
                   <div className="help-content">
                     <h3>1. 自動記録</h3>
                     <p>
-                      アプリを起動すると、アクティブなウィンドウのタイトルを定期的にサンプリングして記録します。
-                      「記録を開始」ボタンを押すことで、バックグラウンドでの収集が始まります。
+                      アプリを起動すると、アクティブなウィンドウの名前を定期的にバックグラウンドで記録します。
+                      サイドバーの「記録を開始」ボタンを押すことで、収集が始まります。
                     </p>
 
-                    <h3>2. タイムテーブル分析</h3>
+                    <h3>2. 時間ごとの活動（タイムテーブル）</h3>
                     <p>
-                      「タイムテーブル」タブでは、24時間×設定期間の作業状況を色分けで確認できます。
-                      各セルは15分単位で集計されており、その時間帯で<strong>最も長く（最も多くサンプリングされた）行っていた作業</strong>が代表として表示されます。
+                      「タイムテーブル」タブでは、24時間×設定期間の作業状況を一覧で確認できます。
+                      各15分間の枠ごとに集計され、その時間帯で<strong>最も長く（多く記録）行っていた作業</strong>が代表としてカラー表示されます。
+                    </p>
+                    <p>
+                      <strong>タイムテーブルの枠（セル）をクリックすると、その15分間の詳しいログ内訳、使用割合、合計時間をモーダルで確認できます。</strong>
                     </p>
                     <p style={{ fontSize: '0.8rem', marginTop: '0.5rem', color: 'var(--text-muted)' }}>
-                      ※「アイドル状態」や記録停止中の時間は、背景色が塗られず透明のまま表示されます。
+                      ※アイドル状態や記録を停止していた時間は透明のまま表示されます。
                     </p>
 
-                    <h3>3. エイリアス（別名）設定</h3>
+                    <h3>3. 表示名の変更ルール</h3>
                     <p>
-                      設定画面から、特定のウィンドウタイトルに含まれるキーワードを「会議」「開発」などの分かりやすい名前に変換できます。
-                      これにより、統計データが見やすくなります。
+                      設定画面から、特定のウィンドウタイトルに含まれるキーワードに対する置換ルールを登録できます。
+                      分かりやすい名前に変えたり、専用の色（カラーピッカーで選択）を付けたりすることができます。
+                      ※フロントエンド側で動的に置換するため、過去の元データが上書きされることはありません。
                     </p>
 
-                    <h3>4. データの書き出し</h3>
+                    <h3>4. データの書き出し（CSV出力）</h3>
                     <p>
-                      サイドバーの「CSV出力」ボタンから、指定した期間のログデータをCSV形式でダウンロードできます。
+                      サイドバーの「CSV出力」から、指定した期間、またはこれまでのすべての記録を1つのCSVファイルとしてエクスポートできます。
                     </p>
                   </div>
                 </section>
@@ -1145,19 +1151,19 @@ function App() {
                     <div className="warning-box">
                       <h4>プライバシーについて</h4>
                       <p>
-                        本アプリは、操作中のウィンドウタイトルを記録します。
-                        個人情報や機密情報がタイトルに含まれる可能性があるため、共有の予定があるときは記録のオン/オフは適切に切り替えてください。
+                        本アプリは、操作中のアクティブウィンドウのタイトルを記録します。
+                        個人情報や機密情報がタイトルに含まれる可能性があるため、必要に応じて記録のオン/オフを切り替えてください。
                       </p>
                     </div>
 
                     <ul className="help-list">
-                      <li><strong>リソース消費:</strong> バックグラウンドでのサンプリングは軽量ですが、低スペックなPCでは動作に影響を与える場合があります。</li>
+                      <li><strong>リソース消費:</strong> バックグラウンドでの記録は非常に軽量ですが、低スペックなPCでは動作に影響を与える場合があります。</li>
                       <li><strong>データの保存場所:</strong> 本アプリに関するすべてのデータは、お使いのPCの以下のディレクトリに保存されます。
                         <div style={{ marginTop: '0.8rem', padding: '1rem', background: 'rgba(0,0,0,0.2)', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.05)' }}>
                           <div style={{ marginBottom: '0.8rem' }}>
                             <span style={{ fontSize: '0.8rem', color: '#94a3b8', display: 'block', marginBottom: '0.2rem' }}>■ メインデータベース (logs.db)</span>
                             <code style={{ fontSize: '0.8rem', color: 'var(--primary)', wordBreak: 'break-all' }}>%APPDATA%\workloggerapp\logs.db</code>
-                            <p style={{ fontSize: '0.75rem', color: '#64748b', marginTop: '0.2rem' }}>※アクティビティログ、収集設定、エイリアス設定が含まれます。</p>
+                            <p style={{ fontSize: '0.75rem', color: '#64748b', marginTop: '0.2rem' }}>※作業履歴データ、環境設定、表示名変更ルールが保存されます。</p>
                           </div>
                           <div style={{ marginBottom: '0.8rem' }}>
                             <span style={{ fontSize: '0.8rem', color: '#94a3b8', display: 'block', marginBottom: '0.2rem' }}>■ アプリケーション設定・キャッシュ</span>
@@ -1166,12 +1172,12 @@ function App() {
                           </div>
                           <div>
                             <span style={{ fontSize: '0.8rem', color: '#94a3b8', display: 'block', marginBottom: '0.2rem' }}>■ エクスポートデータ</span>
-                            <p style={{ fontSize: '0.75rem', color: '#64748b' }}>CSV出力ボタンから保存したファイルは、保存時に指定したフォルダ（通常はダウンロードフォルダ等）に保存されます。</p>
+                            <p style={{ fontSize: '0.75rem', color: '#64748b' }}>CSV出力ボタンから保存したファイルは、ダウンロードフォルダなどの指定された場所に保存されます。</p>
                           </div>
                         </div>
                       </li>
-                      <li><strong>スリープ時の記録:</strong> PCがスリープ状態、キーボードおよびマウス操作がない場合、シャットダウンされている間は記録されません。</li>
-                      <li><strong>アイドル判定:</strong> マウスやキーボードの操作が一定時間（設定可能）ない場合、自動的に「アイドル状態」として記録されます。（無効にする場合は設定でオフにしてください）</li>
+                      <li><strong>スリープ時の記録:</strong> PCがスリープ状態、シャットダウンされている間は記録されません。</li>
+                      <li><strong>操作していない時間の判定:</strong> 一定時間（設定可能）操作がない場合、自動的に「アイドル状態」として記録するか、開いていたウィンドウ名のまま記録するかを設定画面から選ぶことができます。</li>
                     </ul>
                   </div>
                 </section>
@@ -1182,16 +1188,16 @@ function App() {
                   </div>
                   <div className="tips-grid">
                     <div className="tip-item">
-                      <h5>ショートカット</h5>
-                      <p>「現在時刻へジャンプ」ボタンを使うと、タイムテーブル上の今の時間を瞬時に特定できます。</p>
+                      <h5>タイムテーブルの活用</h5>
+                      <p>「現在時刻へジャンプ」ボタンを使うと、今の時間を瞬時に特定してハイライトします。また、気になる枠をクリックして内訳を見るのも便利です。</p>
                     </div>
                     <div className="tip-item">
                       <h5>集計単位の切り替え</h5>
-                      <p>ダッシュボードでは「アプリごと」と「ウィンドウごと」の集計をワンクリックで切り替えられます。</p>
+                      <p>ダッシュボードや詳細内訳画面では、ウィンドウごととアプリごとの集計をいつでもトグル切り替え可能です。</p>
                     </div>
                     <div className="tip-item">
                       <h5>テーマ変更</h5>
-                      <p>サイドバー下のアイコンから、ダークモードとライトモードを切り替えることができます。</p>
+                      <p>サイドバー左下から、ダーク、ライト、システム同期をスムーズに切り替えることができます。目に優しい表示モードをぜひお試しください。</p>
                     </div>
                   </div>
                 </section>
@@ -1199,6 +1205,7 @@ function App() {
             </div>
           </div>
         );
+
 
       default:
         return null;
@@ -1408,7 +1415,7 @@ function App() {
                   <div style={{ marginBottom: '2rem', padding: '1rem', background: 'rgba(255,255,255,0.02)', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.05)' }}>
                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem', flexWrap: 'wrap', gap: '0.5rem' }}>
                       <h3 style={{ fontSize: '0.9rem', fontWeight: '600', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: '0.5rem', margin: 0 }}>
-                        <PieChart size={16} /> {breakdownGroupBy === 'appName' ? 'アプリ使用割合の要約' : 'ウィンドウ使用割合の要約'}
+                        <PieChart size={16} /> {breakdownGroupBy === 'appName' ? 'アプリごとの時間のまとめ' : 'ウィンドウごとの時間のまとめ'}
                       </h3>
                       <div className="toggle-group" style={{ display: 'inline-flex' }}>
                         <button className={breakdownGroupBy === 'windowTitle' ? 'active' : ''} onClick={() => setBreakdownGroupBy('windowTitle')}>ウィンドウ</button>
@@ -1451,7 +1458,7 @@ function App() {
                   </div>
 
                   <h3 style={{ fontSize: '0.9rem', fontWeight: '600', marginBottom: '0.5rem', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                    <List size={16} /> 詳細ログ
+                    <List size={16} /> 詳しい履歴
                   </h3>
                   <table className="logs-table" style={{ width: '100%' }}>
                     <thead>
