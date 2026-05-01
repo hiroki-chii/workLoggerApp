@@ -1,4 +1,4 @@
-const { app, BrowserWindow, ipcMain, dialog } = require('electron');
+const { app, BrowserWindow, ipcMain, dialog, Menu } = require('electron');
 const path = require('path');
 const { spawn } = require('child_process');
 
@@ -167,5 +167,27 @@ function startApp() {
   });
 }
 
-app.whenReady().then(startApp);
+app.whenReady().then(() => {
+  // カスタムメニューの設定 (Viewのみ残す)
+  const template = [
+    {
+      label: 'View',
+      submenu: [
+        { role: 'reload', label: '再読み込み' },
+        { role: 'forceReload', label: '強制的に再読み込み' },
+        { role: 'toggleDevTools', label: 'デベロッパーツールを切り替え' },
+        { type: 'separator' },
+        { role: 'resetZoom', label: '実際のサイズ' },
+        { role: 'zoomIn', label: '拡大' },
+        { role: 'zoomOut', label: '縮小' },
+        { type: 'separator' },
+        { role: 'togglefullscreen', label: '全画面表示を切り替え' }
+      ]
+    }
+  ];
+  const menu = Menu.buildFromTemplate(template);
+  Menu.setApplicationMenu(menu);
+
+  startApp();
+});
 

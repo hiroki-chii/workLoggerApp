@@ -65,47 +65,31 @@ async function collect() {
             logWindow = 'アイドル状態';
           }
         } else if (result.appName && result.appName !== 'None') {
-          shouldLog = true;
-          // Apply alias if keyword matches
-          try {
-            const aliases = _db.prepare('SELECT keyword, alias, match_type, case_sensitive FROM keyword_aliases').all();
-            for (const item of aliases) {
-              let target = logWindow;
-              let kw = item.keyword;
-              if (!item.case_sensitive) {
-                target = target.toLowerCase();
-                kw = kw.toLowerCase();
-              }
-              
-              let isMatch = false;
-              if (item.match_type === 'starts_with') {
-                isMatch = target.startsWith(kw);
-              } else if (item.match_type === 'exact') {
-                isMatch = target === kw;
-              } else {
-                isMatch = target.includes(kw);
-              }
-              
-              if (isMatch) {
-                logAlias = item.alias;
-                break;
-              }
-            }
-          } catch (e) {
-            // Table might not exist yet or other DB error
+          // アプリ自身（WorkPulse）の記録を除外
+          const isSelf = 
+            result.appName.toLowerCase().includes('electron') || 
+            result.appName.toLowerCase().includes('pulsework') ||
+            result.appName.toLowerCase().includes('workloggerapp') ||
+            result.windowTitle.includes('WorkPulse');
+
+          if (!isSelf) {
+            shouldLog = true;
+          }
+          
+          if (!isSelf) {
+            shouldLog = true;
           }
         }
 
         if (shouldLog) {
           _db.prepare(
-            'INSERT INTO logs (appName, windowTitle, alias, timestamp) VALUES (?, ?, ?, ?)'
-          ).run(logApp, logWindow, logAlias, result.timestamp);
+            'INSERT INTO logs (appName, windowTitle, timestamp) VALUES (?, ?, ?)'
+          ).run(logApp, logWindow, result.timestamp);
           
-          console.log('[%s] Logged: %s (%s) [Alias: %s]', 
+          console.log('[%s] Logged: %s (%s)', 
             result.timestamp, 
             logApp, 
-            logWindow.substring(0, 30) + (logWindow.length > 30 ? '...' : ''),
-            logAlias || 'none'
+            logWindow.substring(0, 30) + (logWindow.length > 30 ? '...' : '')
           );
         } else {
           console.log('[%s] Skipped (idle=%ds)', 

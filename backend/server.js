@@ -34,21 +34,9 @@ try {
       key TEXT PRIMARY KEY,
       value TEXT
     );
-    CREATE TABLE IF NOT EXISTS keyword_aliases (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      keyword TEXT UNIQUE,
-      alias TEXT,
-      color TEXT,
-      match_type TEXT DEFAULT 'contains',
-      case_sensitive INTEGER DEFAULT 0
-    );
   `);
 
-  // Add columns if they don't exist
-  try { db.prepare("ALTER TABLE logs ADD COLUMN alias TEXT").run(); } catch(e) {}
-  try { db.prepare("ALTER TABLE keyword_aliases ADD COLUMN match_type TEXT DEFAULT 'contains'").run(); } catch(e) {}
-  try { db.prepare("ALTER TABLE keyword_aliases ADD COLUMN case_sensitive INTEGER DEFAULT 0").run(); } catch(e) {}
-  try { db.prepare("ALTER TABLE keyword_aliases ADD COLUMN color TEXT").run(); } catch(e) {}
+  // DB schema updated to remove alias logic from code level
 
   // Default settings
   db.prepare('INSERT OR IGNORE INTO settings (key, value) VALUES (?, ?)').run('sampling_interval', '30');
@@ -70,7 +58,7 @@ app.get('/api/stats', (req, res) => {
   try {
     const { startDate, endDate, groupBy } = req.query;
     // デフォルトは appName
-    const groupCol = (groupBy === 'windowTitle') ? 'COALESCE(alias, windowTitle)' : 'appName';
+    const groupCol = (groupBy === 'windowTitle') ? 'windowTitle' : 'appName';
     
     let query = `SELECT ${groupCol} AS name, COUNT(*) AS count FROM logs`;
     let params = [];
@@ -97,7 +85,7 @@ app.get('/api/stats', (req, res) => {
 app.get('/api/logs', (req, res) => {
   try {
     const { startDate, endDate } = req.query;
-    let query = "SELECT id, appName, windowTitle, alias, datetime(timestamp, 'localtime') as timestamp FROM logs";
+    let query = "SELECT id, appName, windowTitle, datetime(timestamp, 'localtime') as timestamp FROM logs";
     let params = [];
 
     if (startDate && endDate) {
@@ -143,62 +131,7 @@ app.post('/api/settings', (req, res) => {
   }
 });
 
-// Alias APIs
-app.get('/api/aliases', (req, res) => {
-  try {
-    const aliases = db.prepare('SELECT * FROM keyword_aliases').all();
-    res.json(aliases);
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
-});
-
-function applyAliasToPastLogs(db, keyword, alias, matchType, caseSensitive) {
-  const logs = db.prepare('SELECT id, windowTitle FROM logs WHERE windowTitle IS NOT NULL').all();
-  let updatedCount = 0;
-  
-  const kw = caseSensitive ? keyword : keyword.toLowerCase();
-  const updateStmt = db.prepare('UPDATE logs SET alias = ? WHERE id = ?');
-  
-  db.transaction(() => {
-    for (const log of logs) {
-      let target = log.windowTitle;
-      if (!caseSensitive) target = target.toLowerCase();
-      
-      let isMatch = false;
-      if (matchType === 'starts_with') {
-        isMatch = target.startsWith(kw);
-      } else if (matchType === 'exact') {
-        isMatch = target === kw;
-      } else {
-        isMatch = target.includes(kw);
-      }
-      
-      if (isMatch) {
-        updateStmt.run(alias, log.id);
-        updatedCount++;
-      }
-    }
-  })();
-  return updatedCount;
-}
-
-app.post('/api/aliases', (req, res) => {
-  try {
-    const { keyword, alias, color, applyToPast, matchType = 'contains', caseSensitive = false } = req.body;
-    db.prepare('INSERT OR REPLACE INTO keyword_aliases (keyword, alias, color, match_type, case_sensitive) VALUES (?, ?, ?, ?, ?)').run(keyword, alias, color, matchType, caseSensitive ? 1 : 0);
-    
-    let updatedCount = 0;
-    if (applyToPast) {
-      updatedCount = applyAliasToPastLogs(db, keyword, alias, matchType, caseSensitive);
-    }
-
-    res.json({ success: true, updatedCount });
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
-});
-
+// Alias APIs removed
 app.get('/api/window-titles', (req, res) => {
   try {
     const titles = db.prepare(`
@@ -216,37 +149,12 @@ app.get('/api/window-titles', (req, res) => {
   }
 });
 
-app.delete('/api/aliases/:id', (req, res) => {
-  try {
-    const { id } = req.params;
-    db.prepare('DELETE FROM keyword_aliases WHERE id = ?').run(id);
-    res.json({ success: true });
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
-});
-
-app.put('/api/aliases/:id', (req, res) => {
-  try {
-    const { id } = req.params;
-    const { keyword, alias, color, applyToPast, matchType = 'contains', caseSensitive = false } = req.body;
-    db.prepare('UPDATE keyword_aliases SET keyword = ?, alias = ?, color = ?, match_type = ?, case_sensitive = ? WHERE id = ?').run(keyword, alias, color, matchType, caseSensitive ? 1 : 0, id);
-
-    let updatedCount = 0;
-    if (applyToPast) {
-      updatedCount = applyAliasToPastLogs(db, keyword, alias, matchType, caseSensitive);
-    }
-
-    res.json({ success: true, updatedCount });
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
-});
+// Alias APIs removed
 
 app.get('/api/export', (req, res) => {
   try {
     const { startDate, endDate } = req.query;
-    let query = "SELECT datetime(timestamp, 'localtime') as timestamp, appName, windowTitle, alias FROM logs";
+    let query = "SELECT datetime(timestamp, 'localtime') as timestamp, appName, windowTitle FROM logs";
     let params = [];
 
     if (startDate && endDate) {
@@ -265,8 +173,7 @@ app.get('/api/export', (req, res) => {
       columns: {
         timestamp: '日時',
         appName: 'アプリ名',
-        windowTitle: 'ウィンドウタイトル',
-        alias: 'エイリアス'
+        windowTitle: 'ウィンドウタイトル'
       }
     }).pipe(res);
   } catch (err) {
@@ -295,9 +202,7 @@ app.get('/api/heatmap', (req, res) => {
           strftime('%H', timestamp, 'localtime') as hour,
           (strftime('%M', timestamp, 'localtime') / 15) * 15 as minute,
           appName,
-          COALESCE(alias, windowTitle) as groupWindow,
-          alias,
-          MAX(windowTitle) as origTitle,
+          windowTitle as groupWindow,
           COUNT(*) as taskCount
         FROM logs
         ${whereClause}
@@ -305,15 +210,13 @@ app.get('/api/heatmap', (req, res) => {
       ),
       RankedBuckets AS (
         SELECT 
-          b.logDate, b.hour, b.minute, b.appName, b.groupWindow, b.alias, b.origTitle, b.taskCount,
+          b.logDate, b.hour, b.minute, b.appName, b.groupWindow, b.taskCount,
           SUM(b.taskCount) OVER(PARTITION BY b.logDate, b.hour, b.minute) as totalCount,
-          ROW_NUMBER() OVER(PARTITION BY b.logDate, b.hour, b.minute ORDER BY b.taskCount DESC) as rank,
-          (SELECT color FROM keyword_aliases WHERE alias = b.alias LIMIT 1) as color
+          ROW_NUMBER() OVER(PARTITION BY b.logDate, b.hour, b.minute ORDER BY b.taskCount DESC) as rank
         FROM BucketCounts b
       )
-      SELECT logDate, hour, minute, appName as topApp, 
-             CASE WHEN alias IS NOT NULL THEN alias || ' (' || origTitle || ')' ELSE groupWindow END as topWindow, 
-             taskCount, totalCount as count, color
+      SELECT logDate, hour, minute, appName as topApp, groupWindow as topWindow, 
+             taskCount, totalCount as count
       FROM RankedBuckets
       WHERE rank = 1
     `;
