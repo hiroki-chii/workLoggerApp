@@ -55,15 +55,15 @@ async function collect() {
         const _db = getDb();
         
         let shouldLog = false;
-        let logApp = result.appName;
-        let logWindow = result.windowTitle;
+        let logApp = result.appName || '不明なアプリ';
+        let logWindow = result.windowTitle || '';
 
         if (result.idleSeconds >= settings.idleThreshold) {
           if (settings.recordIdle) {
             shouldLog = true;
             if (settings.idleDisplayMode === 'active_window' && result.appName && result.appName !== 'None') {
               logApp = result.appName;
-              logWindow = result.windowTitle;
+              logWindow = result.windowTitle || '';
             } else {
               logApp = 'アイドル状態';
               logWindow = 'アイドル状態';
@@ -86,7 +86,7 @@ async function collect() {
           console.log('[%s] Logged: %s (%s)', 
             result.timestamp, 
             logApp, 
-            logWindow.substring(0, 30) + (logWindow.length > 30 ? '...' : '')
+            logWindow ? (logWindow.substring(0, 30) + (logWindow.length > 30 ? '...' : '')) : ''
           );
         } else {
           console.log('[%s] Skipped (idle=%ds)', 

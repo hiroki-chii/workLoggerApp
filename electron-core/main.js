@@ -1,4 +1,4 @@
-const { app, BrowserWindow, ipcMain, dialog, Menu } = require('electron');
+const { app, BrowserWindow, ipcMain, dialog, Menu, Tray } = require('electron');
 const path = require('path');
 const { spawn } = require('child_process');
 
@@ -15,6 +15,7 @@ function startApp() {
   let serverProcess = null;
   let collectorProcess = null;
   let mainWindow = null;
+  let tray = null;
   let isQuitting = false;
 
   function createWindow() {
@@ -40,36 +41,55 @@ function startApp() {
       mainWindow.show();
     });
 
-    // ウィンドウを閉じようとした時の処理
+    // ウィンドウを閉じようとした時の処理: タスクトレイに格納
     mainWindow.on('close', (event) => {
       if (isQuitting) return;
+      event.preventDefault();
+      mainWindow.hide();
+    });
+  }
 
-      if (collectorProcess) {
-        event.preventDefault();
-        const choice = dialog.showMessageBoxSync(mainWindow, {
-          type: 'question',
-          buttons: ['はい', 'キャンセル'],
-          title: '記録の停止確認',
-          message: '現在アクティビティを記録中です。記録を停止してアプリを閉じますか？',
-          defaultId: 0,
-          cancelId: 1
-        });
-
-        if (choice === 0) {
-          stopCollector();
-          isQuitting = true;
-          app.quit();
+  function createTray() {
+    const iconPath = path.join(PROJECT_ROOT, 'assets', 'icon.png');
+    tray = new Tray(iconPath);
+    const contextMenu = Menu.buildFromTemplate([
+      {
+        label: '表示',
+        click: () => {
+          if (mainWindow) {
+            mainWindow.show();
+          } else {
+            createWindow();
+          }
         }
-      } else {
-        if (!isQuitting) {
-          // 記録中以外はトレイに隠す（または通常終了。既存の仕様はhide）
-          // ユーザーの「アプリを閉じてください」という言葉に応じ、記録停止時はそのまま終了させる
+      },
+      { type: 'separator' },
+      {
+        label: '終了',
+        click: () => {
           isQuitting = true;
+          stopCollector();
+          if (serverProcess) serverProcess.kill();
           app.quit();
         }
       }
+    ]);
+    tray.setToolTip('PulseWork');
+    tray.setContextMenu(contextMenu);
+
+    tray.on('click', () => {
+      if (mainWindow) {
+        mainWindow.show();
+      }
+    });
+
+    tray.on('double-click', () => {
+      if (mainWindow) {
+        mainWindow.show();
+      }
     });
   }
+
 
   function startServer() {
     const env = {
@@ -117,20 +137,8 @@ function startApp() {
 
   // IPC ハンドラーの登録
   ipcMain.handle('recording:confirm-start', () => {
-    const choice = dialog.showMessageBoxSync(mainWindow, {
-      type: 'question',
-      buttons: ['はい', 'いいえ'],
-      title: '記録の開始確認',
-      message: 'アプリケーションを起動しました。アクティビティの記録を開始しますか？',
-      defaultId: 0,
-      cancelId: 1
-    });
-
-    if (choice === 0) {
-      startCollector();
-      return true;
-    }
-    return false;
+    startCollector();
+    return true;
   });
 
   ipcMain.handle('recording:start', () => {
@@ -147,10 +155,21 @@ function startApp() {
     return !!collectorProcess;
   });
 
+  ipcMain.handle('app:quit-completely', () => {
+    isQuitting = true;
+    stopCollector();
+    if (serverProcess) serverProcess.kill();
+    app.quit();
+    return true;
+  });
+
+
   // 初期化
   startServer();
-  // デフォルトでは記録を開始しない（ユーザー操作を待つ）
+  // アプリケーション起動時に自動で記録（collector）を開始
+  startCollector();
   createWindow();
+  createTray();
 
   app.on('window-all-closed', () => {
     if (process.platform !== 'darwin') app.quit();
@@ -164,6 +183,7 @@ function startApp() {
 
   app.on('activate', () => {
     if (mainWindow === null) createWindow();
+    else mainWindow.show();
   });
 }
 
@@ -190,4 +210,3 @@ app.whenReady().then(() => {
 
   startApp();
 });
-

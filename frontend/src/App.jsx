@@ -148,17 +148,60 @@ function App() {
         return { ...cell, topWindowDisplay: ruleResult.displayTitle, topWindowOriginal: ruleResult.originalTitle, color: ruleResult.color };
       });
 
-      // statsData の置換と再集計（groupBy === 'windowTitle' の場合）
-      let processedStats = statsData;
+      // statsData の置換と再集計、表示数の制限
+      const maxLen = 20;
+      const truncateName = (str) => {
+        if (!str) return '不明なウィンドウ';
+        return str.length > maxLen ? str.substring(0, maxLen) + '...' : str;
+      };
+
+      const maxItems = 6;
+      let processedStats = [];
+
       if (groupBy === 'windowTitle') {
         const mergedStats = {};
         statsData.forEach(stat => {
-          const ruleResult = applyWindowRules(stat.name, rulesData);
-          const disp = ruleResult.displayTitle;
-          if (!mergedStats[disp]) mergedStats[disp] = { name: disp, count: 0, color: ruleResult.color };
-          mergedStats[disp].count += stat.count;
+          const rawName = stat.name || '不明なウィンドウ';
+          const ruleResult = applyWindowRules(rawName, rulesData);
+          const disp = ruleResult.displayTitle || '不明なウィンドウ';
+          const truncated = truncateName(disp);
+
+          if (!mergedStats[truncated]) {
+            mergedStats[truncated] = { name: truncated, count: 0, color: ruleResult.color };
+          }
+          mergedStats[truncated].count += stat.count;
         });
-        processedStats = Object.values(mergedStats).sort((a, b) => b.count - a.count);
+
+        const sorted = Object.values(mergedStats).sort((a, b) => b.count - a.count);
+        if (sorted.length > maxItems) {
+          const topStats = sorted.slice(0, maxItems - 1);
+          const others = sorted.slice(maxItems - 1).reduce((acc, curr) => acc + curr.count, 0);
+          topStats.push({ name: 'その他', count: others, color: '#94a3b8' });
+          processedStats = topStats;
+        } else {
+          processedStats = sorted;
+        }
+      } else {
+        const mergedStats = {};
+        statsData.forEach(stat => {
+          const rawName = stat.name || '不明なアプリ';
+          const truncated = truncateName(rawName);
+
+          if (!mergedStats[truncated]) {
+            mergedStats[truncated] = { name: truncated, count: 0, color: null };
+          }
+          mergedStats[truncated].count += stat.count;
+        });
+
+        const sorted = Object.values(mergedStats).sort((a, b) => b.count - a.count);
+        if (sorted.length > maxItems) {
+          const topStats = sorted.slice(0, maxItems - 1);
+          const others = sorted.slice(maxItems - 1).reduce((acc, curr) => acc + curr.count, 0);
+          topStats.push({ name: 'その他', count: others, color: '#94a3b8' });
+          processedStats = topStats;
+        } else {
+          processedStats = sorted;
+        }
       }
 
       setStats(processedStats);
@@ -228,11 +271,11 @@ function App() {
   };
 
   useEffect(() => {
-    // データ取得が完了し、まだ確認ダイアログを表示していない場合、かつ記録中でない場合に表示
+    // アプリケーション起動時に自動で記録を開始
     if (!loading && !hasPrompted.current && !isRecording) {
       hasPrompted.current = true;
 
-      const confirmStartup = async () => {
+      const autoStartup = async () => {
         if (window.require) {
           try {
             const { ipcRenderer } = window.require('electron');
@@ -243,16 +286,16 @@ function App() {
               setTimeout(fetchData, 1000);
             }
           } catch (err) {
-            console.error('起動時の確認に失敗しました:', err);
+            console.error('起動時の自動記録開始に失敗しました:', err);
           }
         }
       };
 
-      // レンダリングが確実に完了するように少しだけ遅延させる
-      const timer = setTimeout(confirmStartup, 500);
+      const timer = setTimeout(autoStartup, 500);
       return () => clearTimeout(timer);
     }
   }, [loading, isRecording]);
+
 
   useEffect(() => {
     fetchData();
@@ -389,6 +432,7 @@ function App() {
           'rgba(101, 193, 184, 0.7)',
           'rgba(229, 115, 115, 0.7)',
           'rgba(255, 183, 77, 0.7)',
+          'rgba(148, 163, 184, 0.7)',
         ],
         borderColor: [
           '#5c6ac4',
@@ -396,11 +440,13 @@ function App() {
           '#65c1b8',
           '#e57373',
           '#ffb74d',
+          '#94a3b8',
         ],
         borderWidth: 1,
       },
     ],
   };
+
 
   const chartOptions = {
     responsive: true,
@@ -1291,6 +1337,39 @@ function App() {
                   )}
                 </button>
               </div>
+
+              <button
+                onClick={async () => {
+                  if (window.confirm('アプリケーションを完全に終了しますか？\n（バックグラウンドでの記録も停止します）')) {
+                    if (window.require) {
+                      const { ipcRenderer } = window.require('electron');
+                      await ipcRenderer.invoke('app:quit-completely');
+                    }
+                  }
+                }}
+                style={{
+                  width: '100%',
+                  marginTop: '1rem',
+                  padding: '0.6rem',
+                  background: 'rgba(239, 68, 68, 0.15)',
+                  color: '#f87171',
+                  border: '1px solid rgba(239, 68, 68, 0.25)',
+                  borderRadius: '10px',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '0.5rem',
+                  fontWeight: '600',
+                  fontSize: '0.8rem',
+                  transition: 'all 0.2s',
+                  boxShadow: '0 4px 6px rgba(0, 0, 0, 0.05)'
+                }}
+                title="アプリを完全に終了します"
+              >
+                <X size={16} />
+                {!isSidebarCollapsed && 'アプリを閉じる'}
+              </button>
             </div>
           </>
         )}
