@@ -57,9 +57,24 @@ function App() {
   const { theme, setTheme, resolvedTheme } = useTheme();
   // ローカル時刻基準で 'YYYY-MM-DD' を取得
   const today = new Date().toLocaleDateString('sv-SE');
+  // 当日の週の日曜日から土曜日までの範囲を計算
+  const getWeekRange = () => {
+    const now = new Date();
+    const day = now.getDay(); // 0:日, 1:月, ... 6:土
+    const start = new Date(now);
+    start.setDate(now.getDate() - day);
+    const end = new Date(start);
+    end.setDate(start.getDate() + 6);
+    return {
+      start: start.toLocaleDateString('sv-SE'),
+      end: end.toLocaleDateString('sv-SE')
+    };
+  };
+  const weekRange = getWeekRange();
+
   const [isExportModalOpen, setIsExportModalOpen] = useState(false);
   const [exportRange, setExportRange] = useState({ start: today, end: today });
-  const [dateRange, setDateRange] = useState({ start: today, end: today });
+  const [dateRange, setDateRange] = useState(weekRange);
   const [viewMode, setViewMode] = useState('pie'); // 'pie', 'list'
   const [groupBy, setGroupBy] = useState('windowTitle'); // 'appName', 'windowTitle'
   const [breakdownLogs, setBreakdownLogs] = useState([]);
