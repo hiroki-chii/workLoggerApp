@@ -53,6 +53,24 @@ const getWeekRange = () => {
   };
 };
 
+const parseStartTime = (str) => {
+  if (!str) return '記録なし';
+  try {
+    let parsedStr = str;
+    if (!str.includes('T')) {
+      parsedStr = str.replace(' ', 'T');
+    }
+    if (!parsedStr.includes('Z') && !parsedStr.includes('+')) {
+      parsedStr += 'Z';
+    }
+    const d = new Date(parsedStr);
+    return isNaN(d.getTime()) ? '記録なし' : d.toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' });
+  } catch (err) {
+    return '記録なし';
+  }
+};
+
+
 // ウィンドウ名置換ルールの適用関数
 const applyWindowRules = (title, rules = []) => {
   if (!title || title === 'アイドル状態' || title === '無操作') return { displayTitle: title, originalTitle: title, isReplaced: false, color: null };
@@ -651,26 +669,6 @@ function App() {
                     <div style={{ display: 'flex', gap: '0.4rem' }}>
                       <button
                         onClick={async () => {
-                          if (confirm('今日の記録を消去し、作業開始時間をリセットしますか？')) {
-                            await fetch('http://127.0.0.1:3001/api/fatigue/reset', { method: 'POST' });
-                            fetchData();
-                          }
-                        }}
-                        style={{
-                          padding: '0.3rem 0.6rem',
-                          fontSize: '0.75rem',
-                          borderRadius: '6px',
-                          background: 'rgba(239, 68, 68, 0.1)',
-                          border: '1px solid rgba(239, 68, 68, 0.2)',
-                          color: '#ef4444',
-                          cursor: 'pointer',
-                          fontWeight: '600'
-                        }}
-                      >
-                        リセット
-                      </button>
-                      <button
-                        onClick={async () => {
                           if (window.require) {
                             const { ipcRenderer } = window.require('electron');
                             await ipcRenderer.invoke('mini-window:open');
@@ -716,7 +714,7 @@ function App() {
                       <div style={{ fontSize: '0.8rem', color: '#94a3b8', display: 'flex', justifyContent: 'space-between' }}>
                         <span>作業開始時刻</span>
                         <span style={{ color: 'var(--text)', fontWeight: '600' }}>
-                          {fatigueData.startTime ? new Date(fatigueData.startTime).toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' }) : '記録なし'}
+                          {parseStartTime(fatigueData.startTime)}
                         </span>
                       </div>
                       <div style={{ fontSize: '0.8rem', color: '#94a3b8', display: 'flex', justifyContent: 'space-between' }}>
@@ -741,15 +739,18 @@ function App() {
                       color: fatigueData.statusName === 'Danger' ? '#f87171' : fatigueData.statusName === 'Busy' ? '#fb923c' : '#34d399',
                       fontSize: '0.85rem',
                       fontWeight: '600',
-                      lineHeight: '1.4'
+                      lineHeight: '1.4',
+                      whiteSpace: 'pre-line'
                     }}>
                       {fatigueData.statusName === 'Danger'
-                        ? "少し頑張りすぎていませんか？そろそろ小休憩を！"
+                        ? "少し頑張りすぎていませんか？\nそろそろ小休憩を！"
                         : fatigueData.statusName === 'Busy'
-                          ? "そろそろ疲れていませんか？適度に水分補給を！"
+                          ? "そろそろ疲れていませんか？\n適度に水分補給を！"
                           : fatigueData.statusName === 'Good'
-                            ? "良いバランスです。この調子で進めましょう！"
-                            : "休憩を入れながらマイペースに進めましょう！"}
+                            ? "良いバランスです。\nこの調子で進めましょう！"
+                            : fatigueData.statusName === 'Flesh'
+                              ? "まだ作業を始めたばかりです。\nこの調子で進めましょう！"
+                              : "休憩を入れながら\nマイペースに進めましょう！"}
                     </div>
                   </div>
                 </div>
@@ -1193,31 +1194,58 @@ function App() {
                   <div style={{ marginBottom: '2rem', padding: '1.5rem', background: 'rgba(239, 68, 68, 0.05)', border: '1px solid rgba(239, 68, 68, 0.1)', borderRadius: '16px' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '1rem', color: '#f87171' }}>
                       <AlertTriangle size={20} />
-                      <span style={{ fontWeight: '600' }}>記録の削除</span>
+                      <span style={{ fontWeight: '600' }}>記録の削除とリセット</span>
                     </div>
                     <p style={{ color: '#94a3b8', fontSize: '0.9rem', marginBottom: '1.5rem' }}>
-                      これまでに記録されたすべての作業履歴を完全に削除します。
+                      今日のデータを消去して作業開始時間をリセット、またはこれまでに記録されたすべての履歴を完全に削除します。
                     </p>
-                    <button
-                      onClick={handleClearLogs}
-                      className="delete-btn"
-                      style={{
-                        padding: '0.75rem 1.5rem',
-                        borderRadius: '10px',
-                        background: 'rgba(239, 68, 68, 0.2)',
-                        color: '#f87171',
-                        border: '1px solid rgba(239, 68, 68, 0.3)',
-                        cursor: 'pointer',
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '0.5rem',
-                        fontWeight: '600',
-                        transition: 'all 0.2s'
-                      }}
-                    >
-                      <Trash2 size={18} />
-                      すべてのログを削除
-                    </button>
+                    <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap' }}>
+                      <button
+                        onClick={async () => {
+                          if (window.confirm('今日の記録を消去し、作業開始時間をリセットしますか？')) {
+                            await fetch('http://127.0.0.1:3001/api/fatigue/reset', { method: 'POST' });
+                            fetchData();
+                            alert('今日の記録と作業開始時間をリセットしました。');
+                          }
+                        }}
+                        style={{
+                          padding: '0.75rem 1.5rem',
+                          borderRadius: '10px',
+                          background: 'rgba(239, 68, 68, 0.1)',
+                          color: '#ef4444',
+                          border: '1px solid rgba(239, 68, 68, 0.2)',
+                          cursor: 'pointer',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '0.5rem',
+                          fontWeight: '600',
+                          transition: 'all 0.2s'
+                        }}
+                      >
+                        <RefreshCw size={18} />
+                        今日の作業開始時間をリセット
+                      </button>
+                      <button
+                        onClick={handleClearLogs}
+                        className="delete-btn"
+                        style={{
+                          padding: '0.75rem 1.5rem',
+                          borderRadius: '10px',
+                          background: 'rgba(239, 68, 68, 0.2)',
+                          color: '#f87171',
+                          border: '1px solid rgba(239, 68, 68, 0.3)',
+                          cursor: 'pointer',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '0.5rem',
+                          fontWeight: '600',
+                          transition: 'all 0.2s'
+                        }}
+                      >
+                        <Trash2 size={18} />
+                        すべてのログを削除
+                      </button>
+                    </div>
                   </div>
 
                   <div style={{ marginTop: '2rem', padding: '1.5rem', border: '1px dashed rgba(255,255,255,0.1)', borderRadius: '16px', textAlign: 'center' }}>
@@ -1373,26 +1401,6 @@ function App() {
           <div style={{ display: 'flex', gap: '0.3rem', WebkitAppRegion: 'no-drag' }}>
             <button
               onClick={async () => {
-                if (confirm('今日の記録を消去し、作業開始時間をリセットしますか？')) {
-                  await fetch('http://127.0.0.1:3001/api/fatigue/reset', { method: 'POST' });
-                  fetchData();
-                }
-              }}
-              style={{
-                background: 'rgba(239, 68, 68, 0.1)',
-                border: '1px solid rgba(239, 68, 68, 0.2)',
-                color: '#ef4444',
-                borderRadius: '6px',
-                padding: '0.15rem 0.4rem',
-                fontSize: '0.7rem',
-                cursor: 'pointer',
-                fontWeight: '600'
-              }}
-            >
-              リセット
-            </button>
-            <button
-              onClick={async () => {
                 if (window.require) {
                   const { ipcRenderer } = window.require('electron');
                   await ipcRenderer.invoke('mini-window:close');
@@ -1442,17 +1450,19 @@ function App() {
           padding: '0.25rem 0.4rem',
           borderRadius: '6px',
           lineHeight: '1.25',
-          fontWeight: '500'
+          fontWeight: '500',
+          whiteSpace: 'pre-line'
         }}>
           {fatigueData.statusName === 'Danger'
-            ? "少し頑張りすぎていませんか？そろそろ小休憩を！"
+            ? "少し頑張りすぎていませんか？\nそろそろ小休憩を！"
             : fatigueData.statusName === 'Busy'
-              ? "そろそろ疲れていませんか？適度に水分補給を！"
+              ? "そろそろ疲れていませんか？\n適度に水分補給を！"
               : fatigueData.statusName === 'Good'
-                ? "良いバランスです。この調子で進めましょう！"
-                : "休憩を入れながらマイペースに進めましょう！"}
+                ? "良いバランスです。\nこの調子で進めましょう！"
+                : fatigueData.statusName === 'Flesh'
+                  ? "まだ作業を始めたばかりです。\nこの調子で進めましょう！"
+                  : "休憩を入れながら\nマイペースに進めましょう！"}
         </div>
-
 
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderTop: '1px solid rgba(255,255,255,0.05)', paddingTop: '0.35rem', WebkitAppRegion: 'no-drag' }}>
           <label style={{ display: 'flex', alignItems: 'center', gap: '0.25rem', fontSize: '0.65rem', color: '#94a3b8', cursor: 'pointer' }}>

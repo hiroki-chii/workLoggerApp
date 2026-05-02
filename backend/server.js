@@ -150,19 +150,22 @@ app.delete('/api/logs/clear', (req, res) => {
 
 app.get('/api/fatigue', (req, res) => {
   try {
+    const todayLocal = new Date().toLocaleDateString('en-CA');
+    const todayUTC = new Date().toISOString().split('T')[0];
+
     const logInfo = db.prepare(`
       SELECT 
         MIN(timestamp) as startTime, 
         COUNT(*) as activeLogs 
       FROM logs 
-      WHERE date(timestamp, 'localtime') = date('now', 'localtime')
-    `).get();
+      WHERE timestamp LIKE ? OR timestamp LIKE ?
+    `).get(`${todayLocal}%`, `${todayUTC}%`);
 
     if (!logInfo || !logInfo.startTime || logInfo.activeLogs === 0) {
       return res.json({
         fatigueLevel: 0,
-        idleRate: 100,
-        statusName: 'Chill',
+        idleRate: 0,
+        statusName: 'Flesh',
         startTime: null,
         elapsedSeconds: 0,
         activeLogs: 0,
@@ -170,31 +173,32 @@ app.get('/api/fatigue', (req, res) => {
       });
     }
 
-    const timeInfo = db.prepare(`
-      SELECT (strftime('%s', 'now') - strftime('%s', ?)) as elapsedSeconds
-    `).get(logInfo.startTime);
+    const startTimeISO = logInfo.startTime.replace(' ', 'T') + 'Z';
+    const startMs = new Date(startTimeISO).getTime();
+    const nowMs = Date.now();
+    const elapsedSeconds = Math.max(0, Math.floor((nowMs - startMs) / 1000));
 
-    const elapsedSeconds = timeInfo ? timeInfo.elapsedSeconds : 0;
+    console.log('[Fatigue DEBUG] logInfo.startTime:', logInfo.startTime, 'startTimeISO:', startTimeISO);
+    console.log('[Fatigue DEBUG] startMs:', startMs, 'nowMs:', nowMs, 'elapsedSeconds:', elapsedSeconds);
+
     const samplingInterval = 10;
     const expectedLogs = Math.max(1, Math.floor(elapsedSeconds / samplingInterval));
     
     // アイドル率 = (予想されるログ数 - 実際のログ数) / 予想されるログ数
     const idleRatePercent = Math.max(0, Math.min(100, Math.round(((expectedLogs - logInfo.activeLogs) / expectedLogs) * 100)));
+    console.log('[Fatigue DEBUG] expectedLogs:', expectedLogs, 'activeLogs:', logInfo.activeLogs, 'idleRatePercent:', idleRatePercent);
 
     let statusName = 'Danger';
-    if (idleRatePercent >= 30) {
+    if (elapsedSeconds < 1800) {
+      statusName = 'Flesh';
+    } else if (idleRatePercent >= 30) {
       statusName = 'Chill';
     } else if (idleRatePercent >= 15) {
       statusName = 'Good';
     } else if (idleRatePercent >= 10) {
       statusName = 'Busy';
     } else {
-      // 最初の30分(1800秒)以内はDangerをGoodに変更
-      if (elapsedSeconds < 1800) {
-        statusName = 'Good';
-      } else {
-        statusName = 'Danger';
-      }
+      statusName = 'Danger';
     }
 
     // 疲労度 = 100 - アイドル率 (%)
@@ -204,7 +208,7 @@ app.get('/api/fatigue', (req, res) => {
       fatigueLevel,
       idleRate: idleRatePercent,
       statusName,
-      startTime: logInfo.startTime,
+      startTime: startTimeISO,
       elapsedSeconds,
       activeLogs: logInfo.activeLogs,
       expectedLogs
@@ -217,11 +221,30 @@ app.get('/api/fatigue', (req, res) => {
 
 app.post('/api/fatigue/reset', (req, res) => {
   try {
-    db.prepare("DELETE FROM logs WHERE date(timestamp, 'localtime') = date('now', 'localtime')").run();
+    const todayLocal = new Date().toLocaleDateString('en-CA');
+    const todayUTC = new Date().toISOString().split('T')[0];
+
+    db.prepare("DELETE FROM logs WHERE timestamp LIKE ? OR timestamp LIKE ?").run(
+      `${todayLocal}%`,
+      `${todayUTC}%`
+    );
+
     res.json({ success: true });
   } catch (err) {
     console.error('[Server] Reset fatigue error:', err);
     res.status(500).json({ error: err.message });
+  }
+});
+
+app.get('/api/debug-db', (req, res) => {
+  try {
+    const logs = db.prepare("SELECT timestamp FROM logs ORDER BY timestamp DESC LIMIT 20").all();
+    const todayLocal = new Date().toLocaleDateString('en-CA');
+    const todayUTC = new Date().toISOString().split('T')[0];
+    const matchCount = db.prepare("SELECT COUNT(*) as c FROM logs WHERE timestamp LIKE ? OR timestamp LIKE ?").get(`${todayLocal}%`, `${todayUTC}%`).c;
+    res.json({ logs, todayLocal, todayUTC, matchCount });
+  } catch (err) {
+    res.json({ error: err.message });
   }
 });
 
