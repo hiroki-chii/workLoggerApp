@@ -198,12 +198,20 @@ function App() {
         const fData = await fatigueRes.json();
         setFatigueData(fData);
         if (fData.statusName === 'Danger' && prevStatusRef.current && prevStatusRef.current !== 'Danger') {
+          const requiredExpectedLogs = Math.ceil(fData.activeLogs / 0.855);
+          const diffLogs = Math.max(0, requiredExpectedLogs - fData.expectedLogs);
+          const requiredSeconds = diffLogs * 10;
+          const requiredMinutes = requiredSeconds / 60;
+          const restMinutes = Math.ceil(requiredMinutes / 10) * 10;
+          const finalMinutes = restMinutes > 0 ? restMinutes : 10;
+          const message = `長時間の作業お疲れ様です。${finalMinutes}分ほど休憩を取りませんか？`;
+
           if (window.require) {
             const { ipcRenderer } = window.require('electron');
-            ipcRenderer.invoke('alert:danger', "長時間の作業お疲れ様です。そろそろ休憩を取りませんか？");
+            ipcRenderer.invoke('alert:danger', message);
           } else if (typeof window !== 'undefined' && window.Notification) {
             new window.Notification("WorkPulse からのお知らせ", {
-              body: "長時間の作業お疲れ様です。そろそろ休憩を取りませんか？"
+              body: message
             });
           }
         }

@@ -12,7 +12,7 @@ const DB_PATH = process.env.DB_PATH || path.join(process.env.APPDATA, 'worklogge
 // Ensure database directory exists
 const dbDir = path.dirname(DB_PATH);
 if (!fs.existsSync(dbDir)) {
-    fs.mkdirSync(dbDir, { recursive: true });
+  fs.mkdirSync(dbDir, { recursive: true });
 }
 
 app.use(cors({ origin: '*' }));
@@ -67,7 +67,7 @@ app.get('/api/stats', (req, res) => {
     const { startDate, endDate, groupBy } = req.query;
     // デフォルトは appName
     const groupCol = (groupBy === 'windowTitle') ? 'windowTitle' : 'appName';
-    
+
     let query = `SELECT ${groupCol} AS name, COUNT(*) AS count FROM logs`;
     let params = [];
 
@@ -79,9 +79,9 @@ app.get('/api/stats', (req, res) => {
     }
 
     query += ` GROUP BY name ORDER BY count DESC `;
-    
+
     console.log(`[Server] Stats query: ${query} with params: ${params}`);
-    
+
     const stats = db.prepare(query).all(...params);
     res.json(stats);
   } catch (err) {
@@ -119,7 +119,7 @@ app.get('/api/logs/breakdown', (req, res) => {
     // hour と minute を2桁の文字列に整形
     const hStr = hour.toString().padStart(2, '0');
     const mStart = parseInt(minute);
-    
+
     const query = `
       SELECT id, appName, windowTitle, datetime(timestamp, 'localtime') as timestamp 
       FROM logs
@@ -181,13 +181,13 @@ app.get('/api/fatigue', (req, res) => {
 
     const samplingInterval = 10;
     const expectedLogs = Math.max(1, Math.floor(elapsedSeconds / samplingInterval));
-    
+
     // アイドル率 = (予想されるログ数 - 実際のログ数) / 予想されるログ数
     const idleRatePercent = Math.max(0, Math.min(100, Math.round(((expectedLogs - logInfo.activeLogs) / expectedLogs) * 100)));
     console.log('[Fatigue DEBUG] expectedLogs:', expectedLogs, 'activeLogs:', logInfo.activeLogs, 'idleRatePercent:', idleRatePercent);
 
     let statusName = 'Danger';
-    if (elapsedSeconds < 1800) {
+    if (elapsedSeconds < 3600) {
       statusName = 'Flesh';
     } else if (idleRatePercent >= 30) {
       statusName = 'Chill';
@@ -344,7 +344,7 @@ app.get('/api/export', (req, res) => {
 
     query += ' ORDER BY timestamp DESC';
     const logs = db.prepare(query).all(...params);
-    
+
     res.setHeader('Content-Type', 'text/csv');
     res.setHeader('Content-Disposition', 'attachment; filename="work_logs.csv"');
 
@@ -364,7 +364,7 @@ app.get('/api/export', (req, res) => {
 app.get('/api/heatmap', (req, res) => {
   try {
     const { startDate, endDate } = req.query;
-    
+
     let whereClause = "";
     let params = [];
     if (startDate && endDate) {
@@ -400,7 +400,7 @@ app.get('/api/heatmap', (req, res) => {
       FROM RankedBuckets
       WHERE rank = 1
     `;
-    
+
     const data = db.prepare(query).all(...params);
     res.json(data);
   } catch (err) {
