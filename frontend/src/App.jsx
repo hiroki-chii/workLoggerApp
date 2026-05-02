@@ -41,6 +41,8 @@ const API_BASE = 'http://127.0.0.1:3001/api';
 
 function App() {
   const [stats, setStats] = useState([]);
+  const [totalAppsCount, setTotalAppsCount] = useState(0);
+  const [totalWindowsCount, setTotalWindowsCount] = useState(0);
   const [heatmapData, setHeatmapData] = useState([]);
   const [logs, setLogs] = useState([]);
   const [settings, setSettings] = useState({ sampling_interval: '10', default_activity_color: '#6366f1' });
@@ -123,6 +125,24 @@ function App() {
     return <span title={log.displayTitle}>{log.displayTitle}</span>;
   };
 
+  const formatNumberWithSuffix = (num) => {
+    if (num === undefined || num === null) return '0';
+    if (num <= 999) return num.toString();
+
+    const units = ['K', 'M', 'G', 'T'];
+    let value = num;
+    let unit = '';
+
+    for (const u of units) {
+      value /= 1000;
+      unit = u;
+      if (value <= 999) break;
+    }
+
+    const ceiled = Math.ceil(value * 10) / 10;
+    return `${ceiled.toFixed(1)}${unit}`;
+  };
+
 
 
   const fetchData = async () => {
@@ -132,8 +152,9 @@ function App() {
         endDate: dateRange.end
       }).toString();
 
-      const [statsRes, logsRes, heatmapRes, settingsRes, titlesRes, rulesRes, fatigueRes] = await Promise.all([
-        fetch(`${API_BASE}/stats?${params}&groupBy=${groupBy}`),
+      const [statsAppsRes, statsWindowsRes, logsRes, heatmapRes, settingsRes, titlesRes, rulesRes, fatigueRes] = await Promise.all([
+        fetch(`${API_BASE}/stats?${params}&groupBy=appName`),
+        fetch(`${API_BASE}/stats?${params}&groupBy=windowTitle`),
         fetch(`${API_BASE}/logs?${params}`),
         fetch(`${API_BASE}/heatmap?${params}&groupBy=${groupBy}`),
         fetch(`${API_BASE}/settings`),
@@ -142,11 +163,12 @@ function App() {
         fetch(`${API_BASE}/fatigue`)
       ]);
 
-      if (!statsRes.ok || !logsRes.ok || !heatmapRes.ok || !settingsRes.ok) {
-        throw new Error(`Server returned error: ${statsRes.status}`);
+      if (!statsAppsRes.ok || !statsWindowsRes.ok || !logsRes.ok || !heatmapRes.ok || !settingsRes.ok) {
+        throw new Error(`Server returned error: ${statsAppsRes.status}`);
       }
 
-      const statsData = await statsRes.json();
+      const statsAppsData = await statsAppsRes.json();
+      const statsWindowsData = await statsWindowsRes.json();
       const logsData = await logsRes.json();
       const heatmapData = await heatmapRes.json();
       const settingsData = await settingsRes.json();
@@ -180,23 +202,39 @@ function App() {
       };
 
       const maxItems = 6;
+
+      // Merge unique windows
+      const mergedWindows = {};
+      statsWindowsData.forEach(stat => {
+        const rawName = stat.name || '不明なウィンドウ';
+        const ruleResult = applyWindowRules(rawName, rulesData);
+        const disp = ruleResult.displayTitle || '不明なウィンドウ';
+        const truncated = truncateName(disp);
+
+        if (!mergedWindows[truncated]) {
+          mergedWindows[truncated] = { name: truncated, count: 0, color: ruleResult.color };
+        }
+        mergedWindows[truncated].count += stat.count;
+      });
+
+      // Merge unique apps
+      const mergedApps = {};
+      statsAppsData.forEach(stat => {
+        const rawName = stat.name || '不明なアプリ';
+        const truncated = truncateName(rawName);
+
+        if (!mergedApps[truncated]) {
+          mergedApps[truncated] = { name: truncated, count: 0, color: null };
+        }
+        mergedApps[truncated].count += stat.count;
+      });
+
+      setTotalAppsCount(Object.keys(mergedApps).length);
+      setTotalWindowsCount(Object.keys(mergedWindows).length);
+
       let processedStats = [];
-
       if (groupBy === 'windowTitle') {
-        const mergedStats = {};
-        statsData.forEach(stat => {
-          const rawName = stat.name || '不明なウィンドウ';
-          const ruleResult = applyWindowRules(rawName, rulesData);
-          const disp = ruleResult.displayTitle || '不明なウィンドウ';
-          const truncated = truncateName(disp);
-
-          if (!mergedStats[truncated]) {
-            mergedStats[truncated] = { name: truncated, count: 0, color: ruleResult.color };
-          }
-          mergedStats[truncated].count += stat.count;
-        });
-
-        const sorted = Object.values(mergedStats).sort((a, b) => b.count - a.count);
+        const sorted = Object.values(mergedWindows).sort((a, b) => b.count - a.count);
         if (sorted.length > maxItems) {
           const topStats = sorted.slice(0, maxItems - 1);
           const others = sorted.slice(maxItems - 1).reduce((acc, curr) => acc + curr.count, 0);
@@ -206,18 +244,7 @@ function App() {
           processedStats = sorted;
         }
       } else {
-        const mergedStats = {};
-        statsData.forEach(stat => {
-          const rawName = stat.name || '不明なアプリ';
-          const truncated = truncateName(rawName);
-
-          if (!mergedStats[truncated]) {
-            mergedStats[truncated] = { name: truncated, count: 0, color: null };
-          }
-          mergedStats[truncated].count += stat.count;
-        });
-
-        const sorted = Object.values(mergedStats).sort((a, b) => b.count - a.count);
+        const sorted = Object.values(mergedApps).sort((a, b) => b.count - a.count);
         if (sorted.length > maxItems) {
           const topStats = sorted.slice(0, maxItems - 1);
           const others = sorted.slice(maxItems - 1).reduce((acc, curr) => acc + curr.count, 0);
@@ -588,18 +615,19 @@ function App() {
                   <div className="card-title">
                     <Clock size={20} /> 現在の状況
                   </div>
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
-                    <div style={{ padding: '1.5rem', background: 'rgba(99, 102, 241, 0.1)', borderRadius: '16px' }}>
-                      <div style={{ fontSize: '0.8rem', color: '#94a3b8' }}>合計の記録回数</div>
-                      <div style={{ fontSize: '2rem', fontWeight: '800' }}>{stats.reduce((acc, curr) => acc + curr.count, 0)}</div>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+                    <div style={{ padding: '1rem 1.5rem', background: 'rgba(99, 102, 241, 0.1)', borderRadius: '16px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <div style={{ fontSize: '0.9rem', color: '#94a3b8' }}>合計の記録回数</div>
+                      <div style={{ fontSize: '2rem', fontWeight: '800' }}>{formatNumberWithSuffix(stats.reduce((acc, curr) => acc + curr.count, 0))}</div>
                     </div>
-                    <div style={{ padding: '1.5rem', background: 'rgba(34, 211, 238, 0.1)', borderRadius: '16px' }}>
-                      <div style={{ fontSize: '0.8rem', color: '#94a3b8' }}>使われたアプリの数</div>
-                      <div style={{ fontSize: '2rem', fontWeight: '800' }}>{stats.length}</div>
+                    <div style={{ padding: '1rem 1.5rem', background: 'rgba(34, 211, 238, 0.1)', borderRadius: '16px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <div style={{ fontSize: '0.9rem', color: '#94a3b8' }}>使用したアプリの数</div>
+                      <div style={{ fontSize: '2rem', fontWeight: '800' }}>{totalAppsCount}</div>
                     </div>
-                  </div>
-                  <div style={{ marginTop: '1.5rem', padding: '1rem', borderTop: '1px solid rgba(255,255,255,0.05)' }}>
-                    <span style={{ color: '#94a3b8', fontSize: '0.85rem' }}>次の記録まで 約{settings.sampling_interval}秒</span>
+                    <div style={{ padding: '1rem 1.5rem', background: 'rgba(139, 92, 246, 0.1)', borderRadius: '16px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <div style={{ fontSize: '0.9rem', color: '#94a3b8' }}>使用したウィンドウの数</div>
+                      <div style={{ fontSize: '2rem', fontWeight: '800' }}>{totalWindowsCount}</div>
+                    </div>
                   </div>
                 </div>
 
