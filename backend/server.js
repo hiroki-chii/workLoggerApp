@@ -150,15 +150,21 @@ app.delete('/api/logs/clear', (req, res) => {
 
 app.get('/api/fatigue', (req, res) => {
   try {
+    const startOfTodayLocal = new Date();
+    startOfTodayLocal.setHours(0, 0, 0, 0);
+    const endOfTodayLocal = new Date();
+    endOfTodayLocal.setHours(23, 59, 59, 999);
+
+    const startOfTodayUtc = startOfTodayLocal.toISOString().replace('T', ' ').substring(0, 19);
+    const endOfTodayUtc = endOfTodayLocal.toISOString().replace('T', ' ').substring(0, 19);
+
     const logInfo = db.prepare(`
       SELECT 
-        MIN(timestamp) as startTimeUtc,
-        datetime(MIN(timestamp), 'localtime') as startTimeLocal, 
-        (strftime('%s', 'now') - strftime('%s', MIN(timestamp) || ' Z')) as elapsedSeconds,
+        MIN(timestamp) as startTimeUtc, 
         COUNT(*) as activeLogs 
       FROM logs 
-      WHERE date(timestamp, 'localtime') = date('now', 'localtime')
-    `).get();
+      WHERE timestamp BETWEEN ? AND ?
+    `).get(startOfTodayUtc, endOfTodayUtc);
 
     if (!logInfo || !logInfo.startTimeUtc || logInfo.activeLogs === 0) {
       return res.json({
@@ -172,7 +178,18 @@ app.get('/api/fatigue', (req, res) => {
       });
     }
 
-    const elapsedSeconds = logInfo.elapsedSeconds ? logInfo.elapsedSeconds : 0;
+    // パース
+    const parts = logInfo.startTimeUtc.split(/[- :]/);
+    const dateUtc = new Date(Date.UTC(parts[0], parts[1] - 1, parts[2], parts[3], parts[4], parts[5]));
+
+    const localYear = dateUtc.getFullYear();
+    const localMonth = (dateUtc.getMonth() + 1).toString().padStart(2, '0');
+    const localDay = dateUtc.getDate().toString().padStart(2, '0');
+    const localHour = dateUtc.getHours().toString().padStart(2, '0');
+    const localMinute = dateUtc.getMinutes().toString().padStart(2, '0');
+    const startTimeLocalStr = `${localYear}-${localMonth}-${localDay}T${localHour}:${localMinute}:00`;
+
+    const elapsedSeconds = Math.max(0, Math.floor((Date.now() - dateUtc.getTime()) / 1000));
     const samplingInterval = 10;
     const expectedLogs = Math.max(1, Math.floor(elapsedSeconds / samplingInterval));
     
@@ -202,7 +219,7 @@ app.get('/api/fatigue', (req, res) => {
       fatigueLevel,
       idleRate: idleRatePercent,
       statusName,
-      startTime: logInfo.startTimeLocal,
+      startTime: startTimeLocalStr,
       elapsedSeconds,
       activeLogs: logInfo.activeLogs,
       expectedLogs
