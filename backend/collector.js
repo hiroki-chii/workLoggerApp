@@ -59,21 +59,8 @@ async function collect() {
         let logWindow = result.windowTitle || '';
 
         if (result.idleSeconds >= settings.idleThreshold) {
-          if (settings.recordIdle) {
-            shouldLog = true;
-            if (settings.idleDisplayMode === 'active_window' && result.appName && result.appName !== 'None') {
-              logApp = result.appName;
-              logWindow = result.windowTitle || '';
-            } else {
-              logApp = 'アイドル状態';
-              logWindow = 'アイドル状態';
-            }
-          } else {
-            // アイドル状態の記録がオフでも、無操作のまま同じウィンドウを長時間開いている場合はそのままアクティブウィンドウとして記録する
-            if (result.appName && result.appName !== 'None') {
-              shouldLog = true;
-            }
-          }
+          // 無操作の時は記録をスキップ
+          shouldLog = false;
         } else if (result.appName && result.appName !== 'None') {
           shouldLog = true;
         }

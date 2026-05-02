@@ -775,99 +775,30 @@ function App() {
                 </div>
                 <div style={{ padding: '1.5rem' }}>
                   <div style={{ marginBottom: '2rem', padding: '1.5rem', background: 'rgba(255,255,255,0.02)', borderRadius: '16px' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1.5rem' }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flex: 1, marginRight: '1rem' }}>
-                        <Activity size={20} color="#10b981" />
-                        <div style={{ flex: 1 }}>
-                          <div style={{ fontWeight: '600' }}>操作していない時間の記録</div>
-                          <div style={{ fontSize: '0.8rem', color: '#94a3b8' }}>操作がない時間について、「操作していない時間」として記録するか、開いていたウィンドウ名のまま記録するかを選択します</div>
-                        </div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '1.5rem' }}>
+                      <Activity size={20} color="#10b981" />
+                      <div>
+                        <div style={{ fontWeight: '600' }}>無操作の判定設定</div>
+                        <div style={{ fontSize: '0.8rem', color: '#94a3b8' }}>操作がないとみなす時間（アイドル判定しきい値）を設定します。この時間以上操作がない場合、記録は行われません。</div>
                       </div>
-                      <button
-                        onClick={() => handleSaveSetting('record_idle', settings.record_idle === 'true' ? 'false' : 'true')}
-                        style={{
-                          width: '50px',
-                          height: '26px',
-                          borderRadius: '13px',
-                          background: settings.record_idle === 'true' ? '#10b981' : '#475569',
-                          position: 'relative',
-                          border: 'none',
-                          cursor: 'pointer',
-                          transition: 'background 0.3s',
-                          flexShrink: 0
-                        }}
-                      >
-                        <div style={{
-                          width: '20px',
-                          height: '20px',
-                          borderRadius: '50%',
-                          background: 'white',
-                          position: 'absolute',
-                          top: '3px',
-                          left: settings.record_idle === 'true' ? '27px' : '3px',
-                          transition: 'left 0.3s'
-                        }} />
-                      </button>
                     </div>
-
-                    {settings.record_idle === 'true' && (
-                      <div style={{ borderTop: '1px solid rgba(255,255,255,0.05)', paddingTop: '1.5rem' }}>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
-                          <span style={{ fontSize: '0.9rem', color: '#94a3b8' }}>操作していないとみなす時間</span>
-                          <span style={{ fontWeight: '600' }}>{settings.idle_threshold || 300}秒</span>
-                        </div>
-                        <input
-                          type="range"
-                          min="10"
-                          max="300"
-                          step="10"
-                          value={settings.idle_threshold || 300}
-                          onChange={(e) => handleSaveSetting('idle_threshold', e.target.value)}
-                          style={{ width: '100%', accentColor: '#10b981' }}
-                        />
-
-                        <div style={{ borderTop: '1px solid rgba(255,255,255,0.05)', paddingTop: '1.5rem', marginTop: '1.5rem' }}>
-                          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
-                            <span style={{ fontSize: '0.9rem', color: '#94a3b8' }}>操作していないときの表示内容</span>
-                          </div>
-                          <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.5rem' }}>
-                            <button
-                              onClick={() => handleSaveSetting('idle_display_mode', 'idle')}
-                              style={{
-                                padding: '0.4rem 0.8rem',
-                                borderRadius: '8px',
-                                border: '1px solid',
-                                borderColor: (settings.idle_display_mode || 'idle') === 'idle' ? '#10b981' : 'rgba(255,255,255,0.1)',
-                                background: (settings.idle_display_mode || 'idle') === 'idle' ? 'rgba(16, 185, 129, 0.2)' : 'transparent',
-                                color: (settings.idle_display_mode || 'idle') === 'idle' ? '#fff' : '#94a3b8',
-                                cursor: 'pointer',
-                                fontSize: '0.8rem',
-                                transition: 'all 0.2s'
-                              }}
-                            >
-                              アイドル状態
-                            </button>
-                            <button
-                              onClick={() => handleSaveSetting('idle_display_mode', 'active_window')}
-                              style={{
-                                padding: '0.4rem 0.8rem',
-                                borderRadius: '8px',
-                                border: '1px solid',
-                                borderColor: settings.idle_display_mode === 'active_window' ? '#10b981' : 'rgba(255,255,255,0.1)',
-                                background: settings.idle_display_mode === 'active_window' ? 'rgba(16, 185, 129, 0.2)' : 'transparent',
-                                color: settings.idle_display_mode === 'active_window' ? '#fff' : '#94a3b8',
-                                cursor: 'pointer',
-                                fontSize: '0.8rem',
-                                transition: 'all 0.2s'
-                              }}
-                            >
-                              開いているウィンドウの名前
-                            </button>
-                          </div>
-                        </div>
+                    <div style={{ borderTop: '1px solid rgba(255,255,255,0.05)', paddingTop: '1.5rem' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
+                        <span style={{ fontSize: '0.9rem', color: '#94a3b8' }}>操作していないとみなす時間</span>
+                        <span style={{ fontWeight: '600' }}>{settings.idle_threshold || 300}秒</span>
                       </div>
-                    )}
+                      <input
+                        type="range"
+                        min="10"
+                        max="600"
+                        step="10"
+                        value={settings.idle_threshold || 300}
+                        onChange={(e) => handleSaveSetting('idle_threshold', e.target.value)}
+                        style={{ width: '100%', accentColor: '#10b981' }}
+                      />
+                    </div>
                   </div>
+
 
                   {/* 表示名置換ルール設定セクション */}
                   <div style={{ marginBottom: '2rem', padding: '1.5rem', background: 'rgba(255,255,255,0.02)', borderRadius: '16px' }}>
@@ -1197,7 +1128,7 @@ function App() {
                         </div>
                       </li>
                       <li><strong>スリープ時の記録:</strong> PCがスリープ状態、シャットダウンされている間は記録されません。</li>
-                      <li><strong>操作していない時間の判定:</strong> 一定時間（設定可能）操作がない場合、自動的に「アイドル状態」として記録するか、開いていたウィンドウ名のまま記録するかを設定画面から選ぶことができます。</li>
+                      <li><strong>操作していない時間の判定:</strong> 一定時間（設定可能）操作がない場合、作業の記録を自動的に停止します（負荷を抑えるため、無操作時は記録されません）。</li>
                     </ul>
                   </div>
                 </section>
