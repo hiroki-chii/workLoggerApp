@@ -286,6 +286,17 @@ function startApp() {
     return true;
   });
 
+  ipcMain.handle('alert:danger', async (event, message) => {
+    const parentWin = mainWindow && mainWindow.isVisible() ? mainWindow : (miniWindow && miniWindow.isVisible() ? miniWindow : null);
+    await dialog.showMessageBox(parentWin, {
+      type: 'warning',
+      title: 'WorkPulse からのお知らせ',
+      message: message || '長時間の作業お疲れ様です。そろそろ休憩を取りませんか？☕',
+      buttons: ['閉じる']
+    });
+    return true;
+  });
+
 
   // 初期化
   startServer();

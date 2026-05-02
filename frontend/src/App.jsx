@@ -180,7 +180,10 @@ function App() {
         const fData = await fatigueRes.json();
         setFatigueData(fData);
         if (fData.statusName === 'Danger' && prevStatusRef.current && prevStatusRef.current !== 'Danger') {
-          if (typeof window !== 'undefined' && window.Notification) {
+          if (window.require) {
+            const { ipcRenderer } = window.require('electron');
+            ipcRenderer.invoke('alert:danger', "長時間の作業お疲れ様です。そろそろ休憩を取りませんか？☕");
+          } else if (typeof window !== 'undefined' && window.Notification) {
             new window.Notification("WorkPulse からのお知らせ", {
               body: "長時間の作業お疲れ様です。そろそろ休憩を取りませんか？☕"
             });
@@ -719,7 +722,7 @@ function App() {
                       lineHeight: '1.4'
                     }}>
                       {fatigueData.statusName === 'Danger'
-                        ? "少し頑張りすぎてませんか？そろそろ小休憩を！"
+                        ? "少し頑張りすぎていませんか？そろそろ小休憩を！"
                         : fatigueData.statusName === 'Busy'
                           ? "そろそろ疲れていませんか？適度に水分補給を！"
                           : fatigueData.statusName === 'Good'
@@ -1400,7 +1403,7 @@ function App() {
           fontWeight: '500'
         }}>
           {fatigueData.statusName === 'Danger'
-            ? "少し頑張りすぎてませんか？そろそろ小休憩を！"
+            ? "少し頑張りすぎていませんか？そろそろ小休憩を！"
             : fatigueData.statusName === 'Busy'
               ? "そろそろ疲れていませんか？適度に水分補給を！"
               : fatigueData.statusName === 'Good'
