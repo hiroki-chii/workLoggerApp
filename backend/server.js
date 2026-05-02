@@ -150,23 +150,15 @@ app.delete('/api/logs/clear', (req, res) => {
 
 app.get('/api/fatigue', (req, res) => {
   try {
-    const startOfTodayLocal = new Date();
-    startOfTodayLocal.setHours(0, 0, 0, 0);
-    const endOfTodayLocal = new Date();
-    endOfTodayLocal.setHours(23, 59, 59, 999);
-
-    const startOfTodayUtc = startOfTodayLocal.toISOString().replace('T', ' ').substring(0, 19);
-    const endOfTodayUtc = endOfTodayLocal.toISOString().replace('T', ' ').substring(0, 19);
-
     const logInfo = db.prepare(`
       SELECT 
-        MIN(timestamp) as startTimeUtc, 
+        MIN(timestamp) as startTime, 
         COUNT(*) as activeLogs 
       FROM logs 
-      WHERE timestamp BETWEEN ? AND ?
-    `).get(startOfTodayUtc, endOfTodayUtc);
+      WHERE date(timestamp, 'localtime') = date('now', 'localtime')
+    `).get();
 
-    if (!logInfo || !logInfo.startTimeUtc || logInfo.activeLogs === 0) {
+    if (!logInfo || !logInfo.startTime || logInfo.activeLogs === 0) {
       return res.json({
         fatigueLevel: 0,
         idleRate: 100,
@@ -178,18 +170,11 @@ app.get('/api/fatigue', (req, res) => {
       });
     }
 
-    // パース
-    const parts = logInfo.startTimeUtc.split(/[- :]/);
-    const dateUtc = new Date(Date.UTC(parts[0], parts[1] - 1, parts[2], parts[3], parts[4], parts[5]));
+    const timeInfo = db.prepare(`
+      SELECT (strftime('%s', 'now') - strftime('%s', ?)) as elapsedSeconds
+    `).get(logInfo.startTime);
 
-    const localYear = dateUtc.getFullYear();
-    const localMonth = (dateUtc.getMonth() + 1).toString().padStart(2, '0');
-    const localDay = dateUtc.getDate().toString().padStart(2, '0');
-    const localHour = dateUtc.getHours().toString().padStart(2, '0');
-    const localMinute = dateUtc.getMinutes().toString().padStart(2, '0');
-    const startTimeLocalStr = `${localYear}-${localMonth}-${localDay}T${localHour}:${localMinute}:00`;
-
-    const elapsedSeconds = Math.max(0, Math.floor((Date.now() - dateUtc.getTime()) / 1000));
+    const elapsedSeconds = timeInfo ? timeInfo.elapsedSeconds : 0;
     const samplingInterval = 10;
     const expectedLogs = Math.max(1, Math.floor(elapsedSeconds / samplingInterval));
     
@@ -204,12 +189,11 @@ app.get('/api/fatigue', (req, res) => {
     } else if (idleRatePercent >= 10) {
       statusName = 'Busy';
     } else {
-      statusName = 'Danger';
-    }
-
-    // 最初の30分間（1800秒）は、記録数が少なくアイドル率が低くなりがちなため、DangerやBusy判定を避けてGoodに補正します
-    if (elapsedSeconds < 1800 && (statusName === 'Danger' || statusName === 'Busy')) {
-      statusName = 'Good';
+      if (elapsedSeconds < 1800) {
+        statusName = 'Good';
+      } else {
+        statusName = 'Danger';
+      }
     }
 
     // 疲労度 = 100 - アイドル率 (%)
@@ -219,13 +203,12 @@ app.get('/api/fatigue', (req, res) => {
       fatigueLevel,
       idleRate: idleRatePercent,
       statusName,
-      startTime: startTimeLocalStr,
+      startTime: logInfo.startTime,
       elapsedSeconds,
       activeLogs: logInfo.activeLogs,
       expectedLogs
     });
   } catch (err) {
-
     console.error('[Server] Fatigue error:', err);
     res.status(500).json({ error: err.message });
   }
