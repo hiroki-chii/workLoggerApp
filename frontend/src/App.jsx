@@ -123,6 +123,7 @@ function App() {
   const [error, setError] = useState(null);
   const [activeTab, setActiveTab] = useState('dashboard');
   const timetableContainerRef = useRef(null);
+  const prevStatusRef = useRef(null);
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const [isRecording, setIsRecording] = useState(false);
   const { theme, setTheme, resolvedTheme } = useTheme();
@@ -178,6 +179,14 @@ function App() {
       if (fatigueRes && fatigueRes.ok) {
         const fData = await fatigueRes.json();
         setFatigueData(fData);
+        if (fData.statusName === 'Danger' && prevStatusRef.current && prevStatusRef.current !== 'Danger') {
+          if (typeof window !== 'undefined' && window.Notification) {
+            new window.Notification("WorkPulse からのお知らせ", {
+              body: "長時間の作業お疲れ様です。そろそろ休憩を取りませんか？☕"
+            });
+          }
+        }
+        prevStatusRef.current = fData.statusName;
       }
 
 
@@ -1390,13 +1399,13 @@ function App() {
           lineHeight: '1.25',
           fontWeight: '500'
         }}>
-          {fatigueData.statusName === 'Danger' 
+          {fatigueData.statusName === 'Danger'
             ? "作業が集中しています。そろそろ小休憩を！"
-            : fatigueData.statusName === 'Busy' 
-            ? "少し忙しくなっています。適度に水分補給を！" 
-            : fatigueData.statusName === 'Good' 
-            ? "良いバランスです。この調子で進めましょう！" 
-            : "余裕があります。マイペースに進めましょう！"}
+            : fatigueData.statusName === 'Busy'
+              ? "少し忙しくなっています。適度に水分補給を！"
+              : fatigueData.statusName === 'Good'
+                ? "良いバランスです。この調子で進めましょう！"
+                : "余裕があります。マイペースに進めましょう！"}
         </div>
 
 
