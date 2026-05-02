@@ -43,19 +43,11 @@ try {
     );
   `);
 
-  try {
-    db.prepare('ALTER TABLE window_rules ADD COLUMN color TEXT').run();
-  } catch(e) {
-    // Column already exists
-  }
-
-  // DB schema updated to remove alias logic from code level
-
-  // Default settings
-  db.prepare('INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)').run('sampling_interval', '10');
+  // デフォルト設定（初回のみ挿入、既存値は上書きしない）
+  db.prepare('INSERT OR IGNORE INTO settings (key, value) VALUES (?, ?)').run('sampling_interval', '10');
   db.prepare('INSERT OR IGNORE INTO settings (key, value) VALUES (?, ?)').run('record_idle', 'true');
   db.prepare('INSERT OR IGNORE INTO settings (key, value) VALUES (?, ?)').run('idle_threshold', '300');
-  db.prepare('INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)').run('default_activity_color', '#6366f1');
+  db.prepare('INSERT OR IGNORE INTO settings (key, value) VALUES (?, ?)').run('default_activity_color', '#6366f1');
   db.prepare('INSERT OR IGNORE INTO settings (key, value) VALUES (?, ?)').run('idle_display_mode', 'idle');
   console.log('[Server] Database initialized (Better-SQLite3, WAL mode) at: %s', DB_PATH);
 } catch (err) {
@@ -172,7 +164,6 @@ app.post('/api/settings', (req, res) => {
   }
 });
 
-// Alias APIs removed
 app.get('/api/window-titles', (req, res) => {
   try {
     const titles = db.prepare(`

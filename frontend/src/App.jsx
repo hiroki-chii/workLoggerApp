@@ -12,7 +12,6 @@ import {
   LayoutGrid,
 
   RefreshCw,
-  Timer,
   Play,
   Square,
   Sun,
@@ -22,7 +21,7 @@ import {
   AlertTriangle,
   ChevronLeft,
   ChevronRight,
-  Menu,
+
   HelpCircle,
   X,
   Edit2
@@ -51,8 +50,6 @@ function App() {
   const [activeTab, setActiveTab] = useState('dashboard');
   const timetableContainerRef = useRef(null);
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
-  const hasPrompted = useRef(false);
-  const [isSaving, setIsSaving] = useState(false);
   const [isRecording, setIsRecording] = useState(false);
   const { theme, setTheme, resolvedTheme } = useTheme();
   // ローカル時刻基準で 'YYYY-MM-DD' を取得
@@ -145,11 +142,7 @@ function App() {
       const titlesData = await titlesRes.json();
       const rulesData = await rulesRes.json();
 
-      const finalSettings = {
-        ...settingsData,
-        sampling_interval: '10',
-        default_activity_color: '#6366f1'
-      };
+      const finalSettings = settingsData;
 
       setWindowRules(rulesData);
 
@@ -285,31 +278,7 @@ function App() {
     }
   };
 
-  useEffect(() => {
-    // アプリケーション起動時に自動で記録を開始
-    if (!loading && !hasPrompted.current && !isRecording) {
-      hasPrompted.current = true;
 
-      const autoStartup = async () => {
-        if (window.require) {
-          try {
-            const { ipcRenderer } = window.require('electron');
-            const started = await ipcRenderer.invoke('recording:confirm-start');
-            if (started) {
-              setIsRecording(true);
-              // 記録開始時はデータを即時リフレッシュ
-              setTimeout(fetchData, 1000);
-            }
-          } catch (err) {
-            console.error('起動時の自動記録開始に失敗しました:', err);
-          }
-        }
-      };
-
-      const timer = setTimeout(autoStartup, 500);
-      return () => clearTimeout(timer);
-    }
-  }, [loading, isRecording]);
 
 
   useEffect(() => {
@@ -338,7 +307,6 @@ function App() {
       await handleSaveSetting('idle_threshold', value);
     }
 
-    setIsSaving(true);
     try {
       await fetch(`${API_BASE}/settings`, {
         method: 'POST',
@@ -348,8 +316,6 @@ function App() {
       setSettings(prev => ({ ...prev, [key]: finalValue }));
     } catch (err) {
       console.error('設定の保存に失敗しました:', err);
-    } finally {
-      setIsSaving(false);
     }
   };
 
@@ -386,7 +352,7 @@ function App() {
     setIsExportModalOpen(false);
   };
 
-  // Alias handlers removed
+
 
   const handleCellClick = async (date, hour, minute) => {
     setSelectedSlot({ date, hour, minute });
@@ -1264,9 +1230,7 @@ function App() {
               </div>
 
               <div className="agent-status-card">
-                <div className="card-title" style={{ fontSize: '0.8rem', marginBottom: '0.5rem', color: 'var(--text-muted)' }}>
-                  {/* <Cpu size={14} /> {!isSidebarCollapsed && '記録状態'} */}
-                </div>
+
                 <div style={{ fontSize: '0.9rem', color: isRecording ? '#10b981' : '#64748b', display: 'flex', alignItems: 'center', gap: '0.5rem', justifyContent: isSidebarCollapsed ? 'center' : 'flex-start' }}>
                   <div className={`status-dot ${isRecording ? 'active' : 'inactive'}`} />
                   {!isSidebarCollapsed && (isRecording ? '記録中' : '停止中')}

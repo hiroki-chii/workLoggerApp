@@ -82,12 +82,6 @@ function startApp() {
         mainWindow.show();
       }
     });
-
-    tray.on('double-click', () => {
-      if (mainWindow) {
-        mainWindow.show();
-      }
-    });
   }
 
 
@@ -136,11 +130,6 @@ function startApp() {
   }
 
   // IPC ハンドラーの登録
-  ipcMain.handle('recording:confirm-start', () => {
-    startCollector();
-    return true;
-  });
-
   ipcMain.handle('recording:start', () => {
     startCollector();
     return true;

@@ -293,7 +293,25 @@ NU0[0~0W0_00 
 - これまでの変更内容をコミットし、リモートのGitHubリポジトリ（`main` ブランチ）へプッシュ。
 
 
-
-
-
+## 2026-05-02 11:10
+### コード全体のクリーンアップ（無駄なコード・処理の削除）
+- **electron-core/main.js**:
+  - 重複IPCハンドラー `recording:confirm-start` を削除（`recording:start` と完全同一のため）
+  - タスクトレイの `double-click` イベントハンドラーを削除（`click` と同一処理のため）
+- **backend/server.js**:
+  - `sampling_interval` と `default_activity_color` の初期化を `INSERT OR REPLACE` → `INSERT OR IGNORE` に変更（サーバー再起動時にユーザー設定がリセットされるバグを修正）
+  - 不要な `ALTER TABLE` マイグレーション（colorカラム追加）を削除（CREATE TABLE時に含まれている）
+  - Alias削除時の残骸コメントを削除
+- **backend/collector.js**:
+  - 未使用の設定取得（`recordIdle`, `idleDisplayMode`）を削除
+- **frontend/src/App.jsx**:
+  - 未使用import `Timer`, `Menu` を削除
+  - fetchData内の設定ハードコード上書き（sampling_interval, default_activity_color）を削除（サーバーの値を正しく使うように修正）
+  - 起動時自動記録useEffect全体を削除（main.jsで既に自動起動済みのため二重起動だった）
+  - 未使用state `isSaving` と ref `hasPrompted` を削除
+  - コメントアウトされた `<Cpu>` コンポーネントの死コードを削除
+  - Alias関連の空コメントを削除
+- **package.json（ルート）**: 未使用パッケージ `electron-is-dev`, `electron-packager` をアンインストール
+- **frontend/package.json**: 未使用パッケージ `typescript` をアンインストール
+- **ビルド確認**: `npx vite build` 成功
 

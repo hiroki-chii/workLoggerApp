@@ -24,12 +24,10 @@ function getSettings() {
     rows.forEach(r => { settings[r.key] = r.value; });
     return {
       interval: 10 * 1000,
-      recordIdle: settings.record_idle === 'true',
-      idleThreshold: parseInt(settings.idle_threshold || 300),
-      idleDisplayMode: settings.idle_display_mode || 'idle'
+      idleThreshold: parseInt(settings.idle_threshold || 300)
     };
   } catch (err) {
-    return { interval: 10000, recordIdle: false, idleThreshold: 300, idleDisplayMode: 'idle' };
+    return { interval: 10000, idleThreshold: 300 };
   }
 }
 
