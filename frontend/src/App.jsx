@@ -182,10 +182,10 @@ function App() {
         if (fData.statusName === 'Danger' && prevStatusRef.current && prevStatusRef.current !== 'Danger') {
           if (window.require) {
             const { ipcRenderer } = window.require('electron');
-            ipcRenderer.invoke('alert:danger', "長時間の作業お疲れ様です。そろそろ休憩を取りませんか？☕");
+            ipcRenderer.invoke('alert:danger', "長時間の作業お疲れ様です。そろそろ休憩を取りませんか？");
           } else if (typeof window !== 'undefined' && window.Notification) {
             new window.Notification("WorkPulse からのお知らせ", {
-              body: "長時間の作業お疲れ様です。そろそろ休憩を取りませんか？☕"
+              body: "長時間の作業お疲れ様です。そろそろ休憩を取りませんか？"
             });
           }
         }

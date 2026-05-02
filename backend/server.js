@@ -152,13 +152,15 @@ app.get('/api/fatigue', (req, res) => {
   try {
     const logInfo = db.prepare(`
       SELECT 
-        MIN(timestamp) as startTime, 
+        MIN(timestamp) as startTimeUtc,
+        datetime(MIN(timestamp), 'localtime') as startTimeLocal, 
+        (strftime('%s', 'now') - strftime('%s', MIN(timestamp) || ' Z')) as elapsedSeconds,
         COUNT(*) as activeLogs 
       FROM logs 
       WHERE date(timestamp, 'localtime') = date('now', 'localtime')
     `).get();
 
-    if (!logInfo || !logInfo.startTime || logInfo.activeLogs === 0) {
+    if (!logInfo || !logInfo.startTimeUtc || logInfo.activeLogs === 0) {
       return res.json({
         fatigueLevel: 0,
         idleRate: 100,
@@ -170,11 +172,7 @@ app.get('/api/fatigue', (req, res) => {
       });
     }
 
-    const timeInfo = db.prepare(`
-      SELECT (strftime('%s', 'now') - strftime('%s', ?)) as elapsedSeconds
-    `).get(logInfo.startTime);
-
-    const elapsedSeconds = timeInfo ? timeInfo.elapsedSeconds : 0;
+    const elapsedSeconds = logInfo.elapsedSeconds ? logInfo.elapsedSeconds : 0;
     const samplingInterval = 10;
     const expectedLogs = Math.max(1, Math.floor(elapsedSeconds / samplingInterval));
     
@@ -192,6 +190,11 @@ app.get('/api/fatigue', (req, res) => {
       statusName = 'Danger';
     }
 
+    // 最初の30分間（1800秒）は、記録数が少なくアイドル率が低くなりがちなため、DangerやBusy判定を避けてGoodに補正します
+    if (elapsedSeconds < 1800 && (statusName === 'Danger' || statusName === 'Busy')) {
+      statusName = 'Good';
+    }
+
     // 疲労度 = 100 - アイドル率 (%)
     const fatigueLevel = Math.max(0, Math.min(100, 100 - idleRatePercent));
 
@@ -199,12 +202,13 @@ app.get('/api/fatigue', (req, res) => {
       fatigueLevel,
       idleRate: idleRatePercent,
       statusName,
-      startTime: logInfo.startTime,
+      startTime: logInfo.startTimeLocal,
       elapsedSeconds,
       activeLogs: logInfo.activeLogs,
       expectedLogs
     });
   } catch (err) {
+
     console.error('[Server] Fatigue error:', err);
     res.status(500).json({ error: err.message });
   }
