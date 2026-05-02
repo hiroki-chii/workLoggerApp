@@ -39,6 +39,68 @@ ChartJS.register(ArcElement, Tooltip, Legend);
 
 const API_BASE = 'http://127.0.0.1:3001/api';
 
+// 当日の週の日曜日から土曜日までの範囲を計算
+const getWeekRange = () => {
+  const now = new Date();
+  const day = now.getDay(); // 0:日, 1:月, ... 6:土
+  const start = new Date(now);
+  start.setDate(now.getDate() - day);
+  const end = new Date(start);
+  end.setDate(start.getDate() + 6);
+  return {
+    start: start.toLocaleDateString('sv-SE'),
+    end: end.toLocaleDateString('sv-SE')
+  };
+};
+
+// ウィンドウ名置換ルールの適用関数
+const applyWindowRules = (title, rules = []) => {
+  if (!title || title === 'アイドル状態' || title === '無操作') return { displayTitle: title, originalTitle: title, isReplaced: false, color: null };
+
+  for (const rule of rules) {
+    let match = false;
+    if (rule.match_type === 'exact') match = title === rule.keyword;
+    else if (rule.match_type === 'startsWith') match = title.startsWith(rule.keyword);
+    else match = title.includes(rule.keyword); // contains
+
+    if (match) {
+      return { displayTitle: rule.replace_with, originalTitle: title, isReplaced: true, color: rule.color };
+    }
+  }
+  return { displayTitle: title, originalTitle: title, isReplaced: false, color: null };
+};
+
+// ウィンドウタイトル表示用の共通ヘルパー
+const renderWindowTitle = (log) => {
+  if (log.isReplaced) {
+    return (
+      <>
+        <span style={{ color: log.color || 'var(--primary)', fontWeight: '600', marginRight: '8px' }}>{log.displayTitle}</span>
+        <span style={{ color: '#94a3b8', fontSize: '0.85em' }} title={log.originalTitle}>({log.originalTitle})</span>
+      </>
+    );
+  }
+  return <span title={log.displayTitle}>{log.displayTitle}</span>;
+};
+
+const formatNumberWithSuffix = (num) => {
+  if (num === undefined || num === null) return '0';
+  if (num <= 999) return num.toString();
+
+  const units = ['K', 'M', 'G', 'T'];
+  let value = num;
+  let unit = '';
+
+  for (const u of units) {
+    value /= 1000;
+    unit = u;
+    if (value <= 999) break;
+  }
+
+  const ceiled = Math.ceil(value * 10) / 10;
+  return `${ceiled.toFixed(1)}${unit}`;
+};
+
 function App() {
   const [stats, setStats] = useState([]);
   const [totalAppsCount, setTotalAppsCount] = useState(0);
@@ -66,19 +128,6 @@ function App() {
   const { theme, setTheme, resolvedTheme } = useTheme();
   // ローカル時刻基準で 'YYYY-MM-DD' を取得
   const today = new Date().toLocaleDateString('sv-SE');
-  // 当日の週の日曜日から土曜日までの範囲を計算
-  const getWeekRange = () => {
-    const now = new Date();
-    const day = now.getDay(); // 0:日, 1:月, ... 6:土
-    const start = new Date(now);
-    start.setDate(now.getDate() - day);
-    const end = new Date(start);
-    end.setDate(start.getDate() + 6);
-    return {
-      start: start.toLocaleDateString('sv-SE'),
-      end: end.toLocaleDateString('sv-SE')
-    };
-  };
   const weekRange = getWeekRange();
 
   const [isExportModalOpen, setIsExportModalOpen] = useState(false);
@@ -94,54 +143,6 @@ function App() {
   const [windowRules, setWindowRules] = useState([]);
   const [editingRuleId, setEditingRuleId] = useState(null);
   const [editForm, setEditForm] = useState({ keyword: '', replace_with: '', match_type: 'contains', color: '#5c6ac4' });
-
-  // ウィンドウ名置換ルールの適用関数
-  const applyWindowRules = (title, rules = windowRules) => {
-    if (!title || title === 'アイドル状態' || title === '無操作') return { displayTitle: title, originalTitle: title, isReplaced: false, color: null };
-
-    for (const rule of rules) {
-      let match = false;
-      if (rule.match_type === 'exact') match = title === rule.keyword;
-      else if (rule.match_type === 'startsWith') match = title.startsWith(rule.keyword);
-      else match = title.includes(rule.keyword); // contains
-
-      if (match) {
-        return { displayTitle: rule.replace_with, originalTitle: title, isReplaced: true, color: rule.color };
-      }
-    }
-    return { displayTitle: title, originalTitle: title, isReplaced: false, color: null };
-  };
-
-  // ウィンドウタイトル表示用の共通ヘルパー
-  const renderWindowTitle = (log) => {
-    if (log.isReplaced) {
-      return (
-        <>
-          <span style={{ color: log.color || 'var(--primary)', fontWeight: '600', marginRight: '8px' }}>{log.displayTitle}</span>
-          <span style={{ color: '#94a3b8', fontSize: '0.85em' }} title={log.originalTitle}>({log.originalTitle})</span>
-        </>
-      );
-    }
-    return <span title={log.displayTitle}>{log.displayTitle}</span>;
-  };
-
-  const formatNumberWithSuffix = (num) => {
-    if (num === undefined || num === null) return '0';
-    if (num <= 999) return num.toString();
-
-    const units = ['K', 'M', 'G', 'T'];
-    let value = num;
-    let unit = '';
-
-    for (const u of units) {
-      value /= 1000;
-      unit = u;
-      if (value <= 999) break;
-    }
-
-    const ceiled = Math.ceil(value * 10) / 10;
-    return `${ceiled.toFixed(1)}${unit}`;
-  };
 
 
 
@@ -179,8 +180,6 @@ function App() {
         setFatigueData(fData);
       }
 
-
-      const finalSettings = settingsData;
 
       setWindowRules(rulesData);
 
@@ -258,7 +257,7 @@ function App() {
       setStats(processedStats);
       setLogs(processedLogs);
       setHeatmapData(processedHeatmap);
-      setSettings(finalSettings);
+      setSettings(settingsData);
       setWindowTitles(Array.isArray(titlesData) ? titlesData : []);
       setError(null);
       setLoading(false);
@@ -406,7 +405,7 @@ function App() {
       const res = await fetch(`${API_BASE}/logs/breakdown?date=${date}&hour=${hour}&minute=${minute}`);
       if (res.ok) {
         const data = await res.json();
-        const processedData = data.map(log => ({ ...log, ...applyWindowRules(log.windowTitle) }));
+        const processedData = data.map(log => ({ ...log, ...applyWindowRules(log.windowTitle, windowRules) }));
         setBreakdownLogs(processedData);
       }
     } catch (err) {
