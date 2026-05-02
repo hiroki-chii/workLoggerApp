@@ -45,10 +45,8 @@ try {
 
   // デフォルト設定（初回のみ挿入、既存値は上書きしない）
   db.prepare('INSERT OR IGNORE INTO settings (key, value) VALUES (?, ?)').run('sampling_interval', '10');
-  db.prepare('INSERT OR IGNORE INTO settings (key, value) VALUES (?, ?)').run('record_idle', 'true');
   db.prepare('INSERT OR IGNORE INTO settings (key, value) VALUES (?, ?)').run('idle_threshold', '300');
   db.prepare('INSERT OR IGNORE INTO settings (key, value) VALUES (?, ?)').run('default_activity_color', '#6366f1');
-  db.prepare('INSERT OR IGNORE INTO settings (key, value) VALUES (?, ?)').run('idle_display_mode', 'idle');
   db.prepare('INSERT OR IGNORE INTO settings (key, value) VALUES (?, ?)').run('show_mini_on_close', 'true');
   db.prepare('INSERT OR IGNORE INTO settings (key, value) VALUES (?, ?)').run('mini_window_position', '右下');
   // 既存データがある場合は「右上」を「右下」へ補正
