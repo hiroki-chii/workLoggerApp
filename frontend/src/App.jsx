@@ -648,26 +648,48 @@ function App() {
                       <Activity size={20} color={fatigueData.statusName === 'Danger' ? '#ef4444' : fatigueData.statusName === 'Busy' ? '#f97316' : '#10b981'} />
                       <span>疲労状態</span>
                     </div>
-                    <button
-                      onClick={async () => {
-                        if (window.require) {
-                          const { ipcRenderer } = window.require('electron');
-                          await ipcRenderer.invoke('mini-window:open');
-                        }
-                      }}
-                      style={{
-                        padding: '0.3rem 0.6rem',
-                        fontSize: '0.75rem',
-                        borderRadius: '6px',
-                        background: 'rgba(99, 102, 241, 0.1)',
-                        border: '1px solid rgba(99, 102, 241, 0.2)',
-                        color: 'var(--primary)',
-                        cursor: 'pointer',
-                        fontWeight: '600'
-                      }}
-                    >
-                      ミニ画面を表示
-                    </button>
+                    <div style={{ display: 'flex', gap: '0.4rem' }}>
+                      <button
+                        onClick={async () => {
+                          if (confirm('今日の記録を消去し、作業開始時間をリセットしますか？')) {
+                            await fetch('http://127.0.0.1:3001/api/fatigue/reset', { method: 'POST' });
+                            fetchData();
+                          }
+                        }}
+                        style={{
+                          padding: '0.3rem 0.6rem',
+                          fontSize: '0.75rem',
+                          borderRadius: '6px',
+                          background: 'rgba(239, 68, 68, 0.1)',
+                          border: '1px solid rgba(239, 68, 68, 0.2)',
+                          color: '#ef4444',
+                          cursor: 'pointer',
+                          fontWeight: '600'
+                        }}
+                      >
+                        リセット
+                      </button>
+                      <button
+                        onClick={async () => {
+                          if (window.require) {
+                            const { ipcRenderer } = window.require('electron');
+                            await ipcRenderer.invoke('mini-window:open');
+                          }
+                        }}
+                        style={{
+                          padding: '0.3rem 0.6rem',
+                          fontSize: '0.75rem',
+                          borderRadius: '6px',
+                          background: 'rgba(99, 102, 241, 0.1)',
+                          border: '1px solid rgba(99, 102, 241, 0.2)',
+                          color: 'var(--primary)',
+                          cursor: 'pointer',
+                          fontWeight: '600'
+                        }}
+                      >
+                        ミニ画面を表示
+                      </button>
+                    </div>
                   </div>
 
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem', flex: 1, justifyContent: 'center' }}>
@@ -1349,6 +1371,26 @@ function App() {
             <span style={{ fontSize: '0.75rem', fontWeight: '700', color: '#fff' }}>疲労状態</span>
           </div>
           <div style={{ display: 'flex', gap: '0.3rem', WebkitAppRegion: 'no-drag' }}>
+            <button
+              onClick={async () => {
+                if (confirm('今日の記録を消去し、作業開始時間をリセットしますか？')) {
+                  await fetch('http://127.0.0.1:3001/api/fatigue/reset', { method: 'POST' });
+                  fetchData();
+                }
+              }}
+              style={{
+                background: 'rgba(239, 68, 68, 0.1)',
+                border: '1px solid rgba(239, 68, 68, 0.2)',
+                color: '#ef4444',
+                borderRadius: '6px',
+                padding: '0.15rem 0.4rem',
+                fontSize: '0.7rem',
+                cursor: 'pointer',
+                fontWeight: '600'
+              }}
+            >
+              リセット
+            </button>
             <button
               onClick={async () => {
                 if (window.require) {

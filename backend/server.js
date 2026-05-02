@@ -189,6 +189,7 @@ app.get('/api/fatigue', (req, res) => {
     } else if (idleRatePercent >= 10) {
       statusName = 'Busy';
     } else {
+      // 最初の30分(1800秒)以内はDangerをGoodに変更
       if (elapsedSeconds < 1800) {
         statusName = 'Good';
       } else {
@@ -210,6 +211,16 @@ app.get('/api/fatigue', (req, res) => {
     });
   } catch (err) {
     console.error('[Server] Fatigue error:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post('/api/fatigue/reset', (req, res) => {
+  try {
+    db.prepare("DELETE FROM logs WHERE date(timestamp, 'localtime') = date('now', 'localtime')").run();
+    res.json({ success: true });
+  } catch (err) {
+    console.error('[Server] Reset fatigue error:', err);
     res.status(500).json({ error: err.message });
   }
 });
