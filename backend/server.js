@@ -49,6 +49,10 @@ try {
   db.prepare('INSERT OR IGNORE INTO settings (key, value) VALUES (?, ?)').run('idle_threshold', '300');
   db.prepare('INSERT OR IGNORE INTO settings (key, value) VALUES (?, ?)').run('default_activity_color', '#6366f1');
   db.prepare('INSERT OR IGNORE INTO settings (key, value) VALUES (?, ?)').run('idle_display_mode', 'idle');
+  db.prepare('INSERT OR IGNORE INTO settings (key, value) VALUES (?, ?)').run('show_mini_on_close', 'true');
+  db.prepare('INSERT OR IGNORE INTO settings (key, value) VALUES (?, ?)').run('mini_window_position', '右下');
+  // 既存データがある場合は「右上」を「右下」へ補正
+  db.prepare("UPDATE settings SET value = '右下' WHERE key = 'mini_window_position' AND value = '右上'").run();
   console.log('[Server] Database initialized (Better-SQLite3, WAL mode) at: %s', DB_PATH);
 } catch (err) {
   console.error('[Server] Database initialization failed:', err);
@@ -143,6 +147,69 @@ app.delete('/api/logs/clear', (req, res) => {
     res.status(500).json({ error: err.message });
   }
 });
+
+app.get('/api/fatigue', (req, res) => {
+  try {
+    const logInfo = db.prepare(`
+      SELECT 
+        MIN(timestamp) as startTime, 
+        COUNT(*) as activeLogs 
+      FROM logs 
+      WHERE date(timestamp, 'localtime') = date('now', 'localtime')
+    `).get();
+
+    if (!logInfo || !logInfo.startTime || logInfo.activeLogs === 0) {
+      return res.json({
+        fatigueLevel: 0,
+        idleRate: 100,
+        statusName: 'Chill',
+        startTime: null,
+        elapsedSeconds: 0,
+        activeLogs: 0,
+        expectedLogs: 0
+      });
+    }
+
+    const timeInfo = db.prepare(`
+      SELECT (strftime('%s', 'now') - strftime('%s', ?)) as elapsedSeconds
+    `).get(logInfo.startTime);
+
+    const elapsedSeconds = timeInfo ? timeInfo.elapsedSeconds : 0;
+    const samplingInterval = 10;
+    const expectedLogs = Math.max(1, Math.floor(elapsedSeconds / samplingInterval));
+    
+    // アイドル率 = (予想されるログ数 - 実際のログ数) / 予想されるログ数
+    const idleRatePercent = Math.max(0, Math.min(100, Math.round(((expectedLogs - logInfo.activeLogs) / expectedLogs) * 100)));
+
+    let statusName = 'Danger';
+    if (idleRatePercent >= 30) {
+      statusName = 'Chill';
+    } else if (idleRatePercent >= 15) {
+      statusName = 'Good';
+    } else if (idleRatePercent >= 10) {
+      statusName = 'Busy';
+    } else {
+      statusName = 'Danger';
+    }
+
+    // 疲労度 = 100 - アイドル率 (%)
+    const fatigueLevel = Math.max(0, Math.min(100, 100 - idleRatePercent));
+
+    res.json({
+      fatigueLevel,
+      idleRate: idleRatePercent,
+      statusName,
+      startTime: logInfo.startTime,
+      elapsedSeconds,
+      activeLogs: logInfo.activeLogs,
+      expectedLogs
+    });
+  } catch (err) {
+    console.error('[Server] Fatigue error:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
 
 app.get('/api/settings', (req, res) => {
   try {

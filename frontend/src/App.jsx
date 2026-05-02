@@ -45,6 +45,16 @@ function App() {
   const [logs, setLogs] = useState([]);
   const [settings, setSettings] = useState({ sampling_interval: '10', default_activity_color: '#6366f1' });
   const [windowTitles, setWindowTitles] = useState([]);
+  const [fatigueData, setFatigueData] = useState({
+    fatigueLevel: 0,
+    idleRate: 100,
+    statusName: 'Chill',
+    startTime: null,
+    elapsedSeconds: 0,
+    activeLogs: 0,
+    expectedLogs: 0
+  });
+
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [activeTab, setActiveTab] = useState('dashboard');
@@ -122,13 +132,14 @@ function App() {
         endDate: dateRange.end
       }).toString();
 
-      const [statsRes, logsRes, heatmapRes, settingsRes, titlesRes, rulesRes] = await Promise.all([
+      const [statsRes, logsRes, heatmapRes, settingsRes, titlesRes, rulesRes, fatigueRes] = await Promise.all([
         fetch(`${API_BASE}/stats?${params}&groupBy=${groupBy}`),
         fetch(`${API_BASE}/logs?${params}`),
         fetch(`${API_BASE}/heatmap?${params}&groupBy=${groupBy}`),
         fetch(`${API_BASE}/settings`),
         fetch(`${API_BASE}/window-titles`),
-        fetch(`${API_BASE}/window-rules`)
+        fetch(`${API_BASE}/window-rules`),
+        fetch(`${API_BASE}/fatigue`)
       ]);
 
       if (!statsRes.ok || !logsRes.ok || !heatmapRes.ok || !settingsRes.ok) {
@@ -141,6 +152,11 @@ function App() {
       const settingsData = await settingsRes.json();
       const titlesData = await titlesRes.json();
       const rulesData = await rulesRes.json();
+      if (fatigueRes && fatigueRes.ok) {
+        const fData = await fatigueRes.json();
+        setFatigueData(fData);
+      }
+
 
       const finalSettings = settingsData;
 
@@ -586,6 +602,96 @@ function App() {
                     <span style={{ color: '#94a3b8', fontSize: '0.85rem' }}>次の記録まで 約{settings.sampling_interval}秒</span>
                   </div>
                 </div>
+
+                <div className="card" style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                  <div className="card-title" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 0 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                      <Activity size={20} color={fatigueData.statusName === 'Danger' ? '#ef4444' : fatigueData.statusName === 'Busy' ? '#f97316' : '#10b981'} />
+                      <span>疲労状態</span>
+                    </div>
+                    <button
+                      onClick={async () => {
+                        if (window.require) {
+                          const { ipcRenderer } = window.require('electron');
+                          await ipcRenderer.invoke('mini-window:open');
+                        }
+                      }}
+                      style={{
+                        padding: '0.3rem 0.6rem',
+                        fontSize: '0.75rem',
+                        borderRadius: '6px',
+                        background: 'rgba(99, 102, 241, 0.1)',
+                        border: '1px solid rgba(99, 102, 241, 0.2)',
+                        color: 'var(--primary)',
+                        cursor: 'pointer',
+                        fontWeight: '600'
+                      }}
+                    >
+                      ミニ画面を表示
+                    </button>
+                  </div>
+
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem', flex: 1, justifyContent: 'center' }}>
+                    <div style={{ display: 'flex', alignItems: 'baseline', gap: '0.5rem' }}>
+                      <span style={{ fontSize: '2rem', fontWeight: '800', color: fatigueData.statusName === 'Danger' ? '#ef4444' : fatigueData.statusName === 'Busy' ? '#f97316' : 'var(--text)' }}>
+                        {fatigueData.statusName}
+                      </span>
+                      <span style={{ fontSize: '0.85rem', color: '#94a3b8' }}>
+                        (アイドル率 {fatigueData.idleRate}%)
+                      </span>
+                    </div>
+
+                    <div style={{ height: '8px', background: 'rgba(255, 255, 255, 0.05)', borderRadius: '4px', overflow: 'hidden' }}>
+                      <div style={{
+                        height: '100%',
+                        width: `${100 - fatigueData.idleRate}%`,
+                        background: fatigueData.statusName === 'Danger' ? 'linear-gradient(90deg, #ef4444, #f87171)' : fatigueData.statusName === 'Busy' ? 'linear-gradient(90deg, #f97316, #fb923c)' : 'linear-gradient(90deg, #10b981, #34d399)',
+                        borderRadius: '4px',
+                        transition: 'width 0.5s ease'
+                      }} />
+                    </div>
+
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
+                      <div style={{ fontSize: '0.8rem', color: '#94a3b8', display: 'flex', justifyContent: 'space-between' }}>
+                        <span>作業開始時刻</span>
+                        <span style={{ color: 'var(--text)', fontWeight: '600' }}>
+                          {fatigueData.startTime ? new Date(fatigueData.startTime).toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' }) : '記録なし'}
+                        </span>
+                      </div>
+                      <div style={{ fontSize: '0.8rem', color: '#94a3b8', display: 'flex', justifyContent: 'space-between' }}>
+                        <span>実稼働時間</span>
+                        <span style={{ color: 'var(--text)', fontWeight: '600' }}>
+                          {Math.floor(fatigueData.activeLogs * 10 / 60)}分
+                        </span>
+                      </div>
+                      <div style={{ fontSize: '0.8rem', color: '#94a3b8', display: 'flex', justifyContent: 'space-between' }}>
+                        <span>経過時間</span>
+                        <span style={{ color: 'var(--text)', fontWeight: '600' }}>
+                          {Math.floor(fatigueData.elapsedSeconds / 60)}分
+                        </span>
+                      </div>
+                    </div>
+
+                    <div style={{
+                      padding: '0.65rem 0.85rem',
+                      background: fatigueData.statusName === 'Danger' ? 'rgba(239, 68, 68, 0.1)' : fatigueData.statusName === 'Busy' ? 'rgba(249, 115, 22, 0.1)' : 'rgba(16, 185, 129, 0.1)',
+                      border: fatigueData.statusName === 'Danger' ? '1px solid rgba(239, 68, 68, 0.2)' : fatigueData.statusName === 'Busy' ? '1px solid rgba(249, 115, 22, 0.2)' : '1px solid rgba(16, 185, 129, 0.2)',
+                      borderRadius: '12px',
+                      color: fatigueData.statusName === 'Danger' ? '#f87171' : fatigueData.statusName === 'Busy' ? '#fb923c' : '#34d399',
+                      fontSize: '0.85rem',
+                      fontWeight: '600',
+                      lineHeight: '1.4'
+                    }}>
+                      {fatigueData.statusName === 'Danger'
+                        ? "作業が集中しています。そろそろ小休憩を取りましょう！"
+                        : fatigueData.statusName === 'Busy'
+                          ? "少し忙しくなっています。適度に水分補給を！"
+                          : fatigueData.statusName === 'Good'
+                            ? "とても良いバランスです。この調子で進めましょう！"
+                            : "かなり余裕があります。マイペースに進めていきましょう！"}
+                    </div>
+                  </div>
+                </div>
               </section>
             </div>
           </>
@@ -762,6 +868,56 @@ function App() {
                         onChange={(e) => handleSaveSetting('idle_threshold', e.target.value)}
                         style={{ width: '100%', accentColor: '#10b981' }}
                       />
+                    </div>
+                  </div>
+
+                  {/* ミニウィンドウの設定 */}
+                  <div style={{ marginBottom: '2rem', padding: '1.5rem', background: 'rgba(255,255,255,0.02)', borderRadius: '16px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '1.5rem' }}>
+                      <Monitor size={20} color="#6366f1" />
+                      <div>
+                        <div style={{ fontWeight: '600' }}>ミニウィンドウ（ウィジェット）の設定</div>
+                        <div style={{ fontSize: '0.8rem', color: '#94a3b8' }}>親画面を非表示にした際のミニ画面の自動表示、および初期表示位置を設定します。</div>
+                      </div>
+                    </div>
+
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem', borderTop: '1px solid rgba(255,255,255,0.05)', paddingTop: '1.5rem' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <div>
+                          <span style={{ fontSize: '0.9rem', color: 'var(--text)', fontWeight: '500' }}>メイン画面を閉じたときにミニ画面を自動表示</span>
+                          <div style={{ fontSize: '0.8rem', color: '#94a3b8' }}>親画面（PulseWork）を閉じたとき、邪魔にならないミニ画面を表示します。</div>
+                        </div>
+                        <input
+                          type="checkbox"
+                          checked={settings.show_mini_on_close === 'true'}
+                          onChange={(e) => handleSaveSetting('show_mini_on_close', e.target.checked ? 'true' : 'false')}
+                          style={{ width: '18px', height: '18px', accentColor: '#6366f1' }}
+                        />
+                      </div>
+
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem' }}>
+                        <div>
+                          <span style={{ fontSize: '0.9rem', color: 'var(--text)', fontWeight: '500' }}>ミニ画面の初期表示位置</span>
+                          <div style={{ fontSize: '0.8rem', color: '#94a3b8' }}>画面のどの位置に表示するかを決定します。</div>
+                        </div>
+                        <select
+                          value={settings.mini_window_position || '右上'}
+                          onChange={(e) => handleSaveSetting('mini_window_position', e.target.value)}
+                          style={{
+                            padding: '0.5rem',
+                            borderRadius: '6px',
+                            border: '1px solid rgba(255,255,255,0.1)',
+                            background: 'rgba(0,0,0,0.2)',
+                            color: 'var(--text)',
+                            minWidth: '100px'
+                          }}
+                        >
+                          <option value="左上">左上</option>
+                          <option value="右上">右上</option>
+                          <option value="左下">左下</option>
+                          <option value="右下">右下</option>
+                        </select>
+                      </div>
                     </div>
                   </div>
 
@@ -1128,6 +1284,118 @@ function App() {
         return null;
     }
   };
+
+  const isMiniMode = window.location.search.includes('mini=true');
+
+  if (isMiniMode) {
+    return (
+      <div className="mini-window-container fade-in" style={{
+        WebkitAppRegion: 'drag',
+        height: '100vh',
+        padding: '0.6rem 0.75rem',
+        display: 'flex',
+        flexDirection: 'column',
+        justifyContent: 'space-between',
+        background: 'rgba(30, 41, 59, 0.95)',
+        backdropFilter: 'blur(12px)',
+        border: '1px solid rgba(255, 255, 255, 0.1)',
+        borderRadius: '16px',
+        color: '#cbd5e1',
+        boxSizing: 'border-box'
+      }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+            <Activity size={15} color={fatigueData.statusName === 'Danger' ? '#ef4444' : fatigueData.statusName === 'Busy' ? '#f97316' : '#10b981'} />
+            <span style={{ fontSize: '0.75rem', fontWeight: '700', color: '#fff' }}>疲労状態</span>
+          </div>
+          <div style={{ display: 'flex', gap: '0.3rem', WebkitAppRegion: 'no-drag' }}>
+            <button
+              onClick={async () => {
+                if (window.require) {
+                  const { ipcRenderer } = window.require('electron');
+                  await ipcRenderer.invoke('mini-window:close');
+                }
+              }}
+              style={{
+                background: 'rgba(255, 255, 255, 0.05)',
+                border: '1px solid rgba(255, 255, 255, 0.1)',
+                color: '#94a3b8',
+                borderRadius: '6px',
+                padding: '0.15rem 0.4rem',
+                fontSize: '0.7rem',
+                cursor: 'pointer',
+                fontWeight: '600'
+              }}
+            >
+              メイン
+            </button>
+          </div>
+        </div>
+
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem' }}>
+          <div style={{ display: 'flex', alignItems: 'baseline', gap: '0.5rem' }}>
+            <span style={{ fontSize: '1.25rem', fontWeight: '800', color: fatigueData.statusName === 'Danger' ? '#ef4444' : fatigueData.statusName === 'Busy' ? '#f97316' : '#fff' }}>
+              {fatigueData.statusName}
+            </span>
+            <span style={{ fontSize: '0.7rem', color: '#94a3b8' }}>
+              ({fatigueData.idleRate}%)
+            </span>
+          </div>
+          <div style={{ height: '5px', background: 'rgba(255, 255, 255, 0.05)', borderRadius: '2.5px', overflow: 'hidden' }}>
+            <div style={{
+              height: '100%',
+              width: `${100 - fatigueData.idleRate}%`,
+              background: fatigueData.statusName === 'Danger' ? 'linear-gradient(90deg, #ef4444, #f87171)' : fatigueData.statusName === 'Busy' ? 'linear-gradient(90deg, #f97316, #fb923c)' : 'linear-gradient(90deg, #10b981, #34d399)',
+              borderRadius: '2.5px',
+              transition: 'width 0.5s ease'
+            }} />
+          </div>
+        </div>
+
+        <div style={{
+          fontSize: '0.65rem',
+          color: fatigueData.statusName === 'Danger' ? '#f87171' : fatigueData.statusName === 'Busy' ? '#fb923c' : '#34d399',
+          background: fatigueData.statusName === 'Danger' ? 'rgba(239, 68, 68, 0.1)' : fatigueData.statusName === 'Busy' ? 'rgba(249, 115, 22, 0.1)' : 'rgba(16, 185, 129, 0.1)',
+          border: fatigueData.statusName === 'Danger' ? '1px solid rgba(239, 68, 68, 0.2)' : fatigueData.statusName === 'Busy' ? '1px solid rgba(249, 115, 22, 0.2)' : '1px solid rgba(16, 185, 129, 0.2)',
+          padding: '0.25rem 0.4rem',
+          borderRadius: '6px',
+          lineHeight: '1.25',
+          fontWeight: '500'
+        }}>
+          {fatigueData.statusName === 'Danger' 
+            ? "作業が集中しています。そろそろ小休憩を！"
+            : fatigueData.statusName === 'Busy' 
+            ? "少し忙しくなっています。適度に水分補給を！" 
+            : fatigueData.statusName === 'Good' 
+            ? "良いバランスです。この調子で進めましょう！" 
+            : "余裕があります。マイペースに進めましょう！"}
+        </div>
+
+
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderTop: '1px solid rgba(255,255,255,0.05)', paddingTop: '0.35rem', WebkitAppRegion: 'no-drag' }}>
+          <label style={{ display: 'flex', alignItems: 'center', gap: '0.25rem', fontSize: '0.65rem', color: '#94a3b8', cursor: 'pointer' }}>
+            <input
+              type="checkbox"
+              checked={settings.show_mini_on_close === 'true'}
+              onChange={async (e) => {
+                const val = e.target.checked ? 'true' : 'false';
+                handleSaveSetting('show_mini_on_close', val);
+                if (val === 'false' && window.require) {
+                  const { ipcRenderer } = window.require('electron');
+                  await ipcRenderer.invoke('mini-window:close');
+                }
+              }}
+              style={{ width: '12px', height: '12px', accentColor: '#6366f1' }}
+            />
+            <span>メイン画面を閉じたら表示</span>
+          </label>
+          <span style={{ fontSize: '0.65rem', color: '#64748b' }}>
+            稼働: {Math.floor(fatigueData.activeLogs * 10 / 60)}分
+          </span>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className={`dashboard ${isSidebarCollapsed ? 'sidebar-collapsed' : ''}`}>

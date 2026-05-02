@@ -15,8 +15,79 @@ function startApp() {
   let serverProcess = null;
   let collectorProcess = null;
   let mainWindow = null;
+  let miniWindow = null;
   let tray = null;
   let isQuitting = false;
+
+  function createMiniWindow() {
+    if (miniWindow) {
+      miniWindow.show();
+      return;
+    }
+
+    const { screen } = require('electron');
+    const primaryDisplay = screen.getPrimaryDisplay();
+    const { width, height } = primaryDisplay.workAreaSize;
+
+    const miniW = 240;
+    const miniH = 160;
+
+    let x = width - miniW - 20;
+    let y = 20;
+
+    try {
+      const Database = require('better-sqlite3');
+      const db = new Database(DB_PATH);
+      const posObj = db.prepare('SELECT value FROM settings WHERE key = ?').get('mini_window_position');
+      db.close();
+
+      const position = posObj ? posObj.value : '右上';
+
+      if (position === '左上') {
+        x = 20;
+        y = 20;
+      } else if (position === '右上') {
+        x = width - miniW - 20;
+        y = 20;
+      } else if (position === '左下') {
+        x = 20;
+        y = height - miniH - 20;
+      } else if (position === '右下') {
+        x = width - miniW - 20;
+        y = height - miniH - 20;
+      }
+    } catch (err) {
+      console.error('[Main] Failed to read mini window position:', err);
+    }
+
+    miniWindow = new BrowserWindow({
+      x,
+      y,
+      width: miniW,
+      height: miniH,
+      frame: false,
+      transparent: true,
+      alwaysOnTop: true,
+      resizable: false,
+      hasShadow: true,
+      webPreferences: {
+        nodeIntegration: true,
+        contextIsolation: false,
+      },
+      icon: path.join(PROJECT_ROOT, 'assets', 'icon.png'),
+    });
+
+    const isDev = !app.isPackaged;
+    const devUrl = process.env.VITE_DEV_SERVER_URL || 'http://localhost:5173';
+    const miniUrl = isDev 
+      ? `${devUrl}?mini=true` 
+      : `file://${path.join(PROJECT_ROOT, 'frontend/dist/index.html')}?mini=true`;
+
+    miniWindow.loadURL(miniUrl);
+    miniWindow.on('closed', () => {
+      miniWindow = null;
+    });
+  }
 
   function createWindow() {
     mainWindow = new BrowserWindow({
@@ -46,6 +117,51 @@ function startApp() {
       if (isQuitting) return;
       event.preventDefault();
       mainWindow.hide();
+
+      try {
+        const Database = require('better-sqlite3');
+        const db = new Database(DB_PATH);
+        const row = db.prepare('SELECT value FROM settings WHERE key = ?').get('show_mini_on_close');
+        db.close();
+
+        if (row && row.value === 'true') {
+          createMiniWindow();
+        }
+      } catch (err) {
+        console.error('[Main] Failed to read show_mini_on_close setting:', err);
+        // デフォルトではミニ画面を表示
+        createMiniWindow();
+      }
+    });
+
+    // 最小化された時の処理: ミニ画面表示
+    mainWindow.on('minimize', () => {
+      try {
+        const Database = require('better-sqlite3');
+        const db = new Database(DB_PATH);
+        const row = db.prepare('SELECT value FROM settings WHERE key = ?').get('show_mini_on_close');
+        db.close();
+
+        if (row && row.value === 'true') {
+          createMiniWindow();
+        }
+      } catch (err) {
+        console.error('[Main] Failed to read show_mini_on_close setting on minimize:', err);
+        createMiniWindow();
+      }
+    });
+
+    // 復元された時の処理: ミニ画面を閉じる
+    mainWindow.on('restore', () => {
+      if (miniWindow) {
+        miniWindow.close();
+      }
+    });
+
+    mainWindow.on('show', () => {
+      if (miniWindow) {
+        miniWindow.close();
+      }
     });
   }
 
@@ -149,6 +265,24 @@ function startApp() {
     stopCollector();
     if (serverProcess) serverProcess.kill();
     app.quit();
+    return true;
+  });
+
+  ipcMain.handle('mini-window:open', () => {
+    createMiniWindow();
+    if (mainWindow) {
+      mainWindow.hide();
+    }
+    return true;
+  });
+
+  ipcMain.handle('mini-window:close', () => {
+    if (miniWindow) {
+      miniWindow.close();
+    }
+    if (mainWindow) {
+      mainWindow.show();
+    }
     return true;
   });
 
