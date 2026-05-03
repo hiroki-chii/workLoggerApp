@@ -951,7 +951,15 @@ function App() {
                       <Activity size={20} color="#10b981" />
                       <div>
                         <div style={{ fontWeight: '600' }}>無操作の判定設定</div>
-                        <div style={{ fontSize: '0.8rem', color: '#94a3b8' }}>操作がないとみなす時間（アイドル判定しきい値）を設定します。この時間以上操作がない場合、記録は行われません。</div>
+                        <div style={{ fontSize: '0.8rem', color: '#94a3b8' }}>
+                          操作がないとみなす時間（アイドル判定しきい値）を設定します。この時間以上操作がない場合、記録は行われません。
+                          <div style={{ marginTop: '0.5rem', display: 'flex', flexDirection: 'column', gap: '0.25rem', padding: '0.5rem 0.75rem', background: 'rgba(255,255,255,0.03)', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.05)' }}>
+                            <div style={{ fontSize: '0.75rem', fontWeight: '600', color: 'var(--text)' }}>■ ワークスタイルによる設定の目安</div>
+                            <div style={{ fontSize: '0.75rem' }}>・<strong style={{ color: 'var(--text)' }}>180秒以内</strong>：細かく離席を検知したい方向け（短期離席の自動除外）</div>
+                            <div style={{ fontSize: '0.75rem' }}>・<strong style={{ color: 'var(--text)' }}>300秒目安</strong>：通常のオフィスワーク（一般的な推奨値・初期値）</div>
+                            <div style={{ fontSize: '0.75rem' }}>・<strong style={{ color: 'var(--text)' }}>600秒目安</strong>：資料の精読、思考時間の長いクリエイティブ作業向け</div>
+                          </div>
+                        </div>
                       </div>
                     </div>
                     <div style={{ borderTop: '1px solid rgba(255,255,255,0.05)', paddingTop: '1.5rem' }}>
