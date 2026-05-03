@@ -872,6 +872,8 @@ function App() {
                         );
                         const isIdle = cell && (cell.topApp === 'アイドル状態' || cell.topApp === '無操作');
                         const cellColor = cell?.color || settings.default_activity_color || 'var(--primary)';
+                        const cellDuration = cell ? cell.count * parseInt(settings.sampling_interval || 10) : 0;
+                        const durationStr = cellDuration >= 60 ? `${Math.floor(cellDuration / 60)}分${cellDuration % 60}秒` : `${cellDuration}秒`;
                         return (
                           <div
                             key={date}
@@ -883,7 +885,7 @@ function App() {
                               cursor: cell ? 'pointer' : 'default'
                             }}
                             onClick={() => cell && handleCellClick(date, h, m)}
-                            title={cell ? `${date} ${h}:${m}\nアプリ: ${cell.topApp}\nウィンドウ: ${cell.topWindowDisplay}${cell.topWindowDisplay !== cell.topWindowOriginal ? ` (${cell.topWindowOriginal})` : ''}\nサンプリング数: ${cell.count} samples\n(クリックで内訳を表示)` : undefined}
+                            title={cell ? `${date} ${h}:${m}\nアプリ: ${cell.topApp}\nウィンドウ: ${cell.topWindowDisplay}${cell.topWindowDisplay !== cell.topWindowOriginal ? ` (${cell.topWindowOriginal})` : ''}\nサンプリング数: ${cell.count} samples\n合計時間: ${durationStr}\n(クリックで内訳を表示)` : undefined}
                           />
                         );
                       })}
@@ -1837,8 +1839,17 @@ function App() {
                 <h2 style={{ fontSize: '1.2rem', fontWeight: '700', color: 'var(--text)' }}>
                   ログの内訳
                 </h2>
-                <div style={{ fontSize: '0.85rem', color: '#94a3b8', marginTop: '0.2rem' }}>
-                  {selectedSlot?.date} {selectedSlot?.hour}:{selectedSlot?.minute} (15分間)
+                <div style={{ fontSize: '0.85rem', color: '#94a3b8', marginTop: '0.2rem', display: 'flex', gap: '1rem', alignItems: 'center' }}>
+                  <span>{selectedSlot?.date} {selectedSlot?.hour}:{selectedSlot?.minute} (15分間)</span>
+                  {breakdownLogs.length > 0 && (
+                    <span style={{ color: 'var(--primary)', fontWeight: '600' }}>
+                      合計記録時間: {
+                        (breakdownLogs.length * parseInt(settings.sampling_interval || 10)) >= 60
+                          ? `${Math.floor((breakdownLogs.length * parseInt(settings.sampling_interval || 10)) / 60)}分${(breakdownLogs.length * parseInt(settings.sampling_interval || 10)) % 60}秒`
+                          : `${breakdownLogs.length * parseInt(settings.sampling_interval || 10)}秒`
+                      }
+                    </span>
+                  )}
                 </div>
               </div>
               <button onClick={() => setIsBreakdownModalOpen(false)} className="close-btn" style={{ background: 'none', border: 'none', color: '#94a3b8', cursor: 'pointer' }}>
