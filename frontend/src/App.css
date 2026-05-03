@@ -989,7 +989,7 @@ select option {
 
 .pet-shake {
   display: inline-block;
-  animation: petShake 1.0s linear infinite;
+  animation: petShake 2s linear infinite;
 }
 
 @keyframes petShake {
@@ -1040,7 +1040,7 @@ select option {
 
 .pet-pulse {
   display: inline-block;
-  animation: petPulse 3s ease-in-out infinite alternate;
+  animation: petPulse 2s ease-in-out infinite alternate;
 }
 
 @keyframes petPulse {
@@ -1050,7 +1050,41 @@ select option {
   }
 
   100% {
-    transform: scale(1.15);
+    transform: scale(1);
     opacity: 1;
+  }
+}
+
+.pet-pulse-subtle {
+  display: inline-block;
+  animation: petPulseSubtle 2s ease-in-out infinite alternate;
+}
+
+@keyframes petPulseSubtle {
+  0% {
+    transform: scale(0.97);
+    opacity: 0.98;
+  }
+
+  100% {
+    transform: scale(1.02);
+    opacity: 1;
+  }
+}
+
+.pet-sparkle {
+  animation: petSparkle 1.2s ease-in-out infinite alternate;
+  transform-origin: center;
+}
+
+@keyframes petSparkle {
+  0% {
+    opacity: 0.3;
+    transform: scale(1);
+  }
+
+  100% {
+    opacity: 1;
+    transform: scale(1.2);
   }
 }

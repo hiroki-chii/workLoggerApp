@@ -127,7 +127,7 @@ const getFatigueAdvice = (statusName) => {
   if (statusName === 'Critical') return "少し頑張りすぎていませんか？\nそろそろ小休憩を！";
   if (statusName === 'Strained') return "そろそろ疲れていませんか？\n適度に水分補給を！";
   if (statusName === 'Focused') return "良いバランスです。\nこの調子で進めましょう！";
-  if (statusName === 'Balanced') return "休憩を入れながら\nマイペースに進めましょう！";
+  if (statusName === 'Balanced') return "マイペースに進めましょう！";
   if (statusName === 'Restored') return "新鮮な気持ちで進めていきましょう！！";
   return "稼働データの集計を開始しました。\n今日も一日頑張りましょう！！";
 };
@@ -1410,23 +1410,29 @@ function App() {
                 mouth = <path d="M 18 23 Q 20 26 22 23" stroke="#fff" strokeWidth="2" fill="none" strokeLinecap="round" />;
               } else if (status === 'Focused') {
                 bodyColor = '#34d399';
-                className = 'pet-float';
+                className = 'pet-pulse-subtle';
                 mouth = <path d="M 18 22 Q 20 25 22 22" stroke="#fff" strokeWidth="2" fill="none" strokeLinecap="round" />;
               } else if (status === 'Balanced') {
                 bodyColor = '#38bdf8';
-                className = 'pet-pulse';
+                className = 'pet-float';
                 eyeLeft = <path d="M 12 18 L 16 18" stroke="#fff" strokeWidth="2" strokeLinecap="round" />;
                 eyeRight = <path d="M 24 18 L 28 18" stroke="#fff" strokeWidth="2" strokeLinecap="round" />;
-                mouth = <path d="M 18 23 L 22 23" stroke="#fff" strokeWidth="2" strokeLinecap="round" />;
+                mouth = <path d="M 18 22 Q 20 25 22 22" stroke="#fff" strokeWidth="2" fill="none" strokeLinecap="round" />;
               } else if (status === 'Strained') {
                 bodyColor = '#fb923c';
                 className = 'pet-shake';
                 eyeLeft = <circle cx="14" cy="18" r="1.5" fill="#fff" />;
                 eyeRight = <circle cx="26" cy="18" r="1.5" fill="#fff" />;
-                mouth = <path d="M 18 24 L 22 22 L 22 24 L 18 22 Z" fill="#fff" />;
+                mouth = <path d="M 17 25 Q 20 21 23 25" stroke="#fff" strokeWidth="2" fill="none" strokeLinecap="round" />;
+              } else if (status === 'Calculating') {
+                bodyColor = '#94a3b8';
+                className = 'pet-pulse';
+                eyeLeft = <path d="M 12 18 L 16 18" stroke="#fff" strokeWidth="2" strokeLinecap="round" />;
+                eyeRight = <path d="M 24 18 L 28 18" stroke="#fff" strokeWidth="2" strokeLinecap="round" />;
+                mouth = <circle cx="20" cy="24" r="1.5" fill="#fff" />;
               } else { // Critical
                 bodyColor = '#f87171';
-                className = 'pet-shake';
+                className = 'pet-danger-shake';
                 eyeLeft = <path d="M 12 16 L 16 20 M 16 16 L 12 20" stroke="#fff" strokeWidth="2" strokeLinecap="round" />;
                 eyeRight = <path d="M 24 16 L 28 20 M 28 16 L 24 20" stroke="#fff" strokeWidth="2" fill="none" strokeLinecap="round" />;
                 mouth = <path d="M 17 25 Q 20 21 23 25" stroke="#fff" strokeWidth="2" fill="none" strokeLinecap="round" />;
@@ -1450,6 +1456,18 @@ function App() {
                   {eyeLeft}
                   {eyeRight}
                   {mouth}
+                  {status === 'Focused' && (
+                    <>
+                      <path d="M 5 9 L 7 11 L 5 13 L 3 11 Z" fill="#fef08a" opacity="0.9" className="pet-sparkle" style={{ animationDelay: '0s' }} />
+                      <path d="M 34 10 L 35.5 11.5 L 34 13 L 32.5 11.5 Z" fill="#fef08a" opacity="0.9" className="pet-sparkle" style={{ animationDelay: '0.4s' }} />
+                    </>
+                  )}
+                  {(status === 'Critical' || status === 'Strained') && (
+                    <>
+                      <path d="M 31 11 Q 33 13 32 15 Q 31 16 30 14 Q 29 13 31 11 Z" fill="#38bdf8" />
+                      <path d="M 34 14 Q 36 16 35 18 Q 34 19 33 17 Q 32 16 34 14 Z" fill="#38bdf8" />
+                    </>
+                  )}
                 </svg>
               );
             })()}
@@ -1503,20 +1521,26 @@ function App() {
                   mouth = <path d="M 18 23 Q 20 26 22 23" stroke="#fff" strokeWidth="2" fill="none" strokeLinecap="round" />;
                 } else if (status === 'Focused') {
                   bodyColor = '#34d399';
-                  className = 'pet-float';
+                  className = 'pet-pulse-subtle';
                   mouth = <path d="M 18 22 Q 20 25 22 22" stroke="#fff" strokeWidth="2" fill="none" strokeLinecap="round" />;
                 } else if (status === 'Balanced') {
                   bodyColor = '#38bdf8';
-                  className = 'pet-pulse';
+                  className = 'pet-float';
                   eyeLeft = <path d="M 12 18 L 16 18" stroke="#fff" strokeWidth="2" strokeLinecap="round" />;
                   eyeRight = <path d="M 24 18 L 28 18" stroke="#fff" strokeWidth="2" strokeLinecap="round" />;
-                  mouth = <path d="M 18 23 L 22 23" stroke="#fff" strokeWidth="2" strokeLinecap="round" />;
+                  mouth = <path d="M 18 22 Q 20 25 22 22" stroke="#fff" strokeWidth="2" fill="none" strokeLinecap="round" />;
                 } else if (status === 'Strained') {
                   bodyColor = '#fb923c';
                   className = 'pet-shake';
                   eyeLeft = <circle cx="14" cy="18" r="1.5" fill="#fff" />;
                   eyeRight = <circle cx="26" cy="18" r="1.5" fill="#fff" />;
-                  mouth = <path d="M 18 24 L 22 22 L 22 24 L 18 22 Z" fill="#fff" />;
+                  mouth = <path d="M 17 25 Q 20 21 23 25" stroke="#fff" strokeWidth="2" fill="none" strokeLinecap="round" />;
+                } else if (status === 'Calculating') {
+                  bodyColor = '#94a3b8';
+                  className = 'pet-pulse';
+                  eyeLeft = <path d="M 12 18 L 16 18" stroke="#fff" strokeWidth="2" strokeLinecap="round" />;
+                  eyeRight = <path d="M 24 18 L 28 18" stroke="#fff" strokeWidth="2" strokeLinecap="round" />;
+                  mouth = <circle cx="20" cy="24" r="1.5" fill="#fff" />;
                 } else { // Critical
                   bodyColor = '#f87171';
                   className = 'pet-danger-shake';
@@ -1537,7 +1561,13 @@ function App() {
                     {eyeLeft}
                     {eyeRight}
                     {mouth}
-                    {status === 'Critical' && (
+                    {status === 'Focused' && (
+                      <>
+                        <path d="M 5 9 L 7 11 L 5 13 L 3 11 Z" fill="#fef08a" opacity="0.9" className="pet-sparkle" style={{ animationDelay: '0s' }} />
+                        <path d="M 34 10 L 35.5 11.5 L 34 13 L 32.5 11.5 Z" fill="#fef08a" opacity="0.9" className="pet-sparkle" style={{ animationDelay: '0.4s' }} />
+                      </>
+                    )}
+                    {(status === 'Critical' || status === 'Strained') && (
                       <>
                         <path d="M 31 11 Q 33 13 32 15 Q 31 16 30 14 Q 29 13 31 11 Z" fill="#38bdf8" />
                         <path d="M 34 14 Q 36 16 35 18 Q 34 19 33 17 Q 32 16 34 14 Z" fill="#38bdf8" />
