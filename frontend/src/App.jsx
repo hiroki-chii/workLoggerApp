@@ -125,7 +125,7 @@ const formatNumberWithSuffix = (num) => {
 
 const getFatigueAdvice = (statusName) => {
   if (statusName === 'Critical') return "少し頑張りすぎていませんか？\nそろそろ小休憩を！";
-  if (statusName === 'Strained') return "そろそろ疲れていませんか？\n適度に水分補給を！";
+  if (statusName === 'Strained') return "そろそろ疲れていませんか？\n深呼吸でリフレッシュを！";
   if (statusName === 'Focused') return "良いバランスです。\nこの調子で進めましょう！";
   if (statusName === 'Balanced') return "マイペースに進めましょう！";
   if (statusName === 'Restored') return "新鮮な気持ちで進めていきましょう！！";
