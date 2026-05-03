@@ -1357,6 +1357,17 @@ function App() {
 
   const isMiniMode = window.location.search.includes('mini=true');
 
+  useEffect(() => {
+    if (isMiniMode) {
+      document.body.style.background = 'transparent';
+      document.body.style.borderRadius = '16px';
+      document.body.style.overflow = 'hidden';
+      if (document.documentElement) {
+        document.documentElement.style.background = 'transparent';
+      }
+    }
+  }, [isMiniMode]);
+
   if (isMiniMode) {
     return (
       <div className="mini-window-container fade-in" style={{
@@ -1371,12 +1382,72 @@ function App() {
         border: '1px solid rgba(255, 255, 255, 0.1)',
         borderRadius: '16px',
         color: '#cbd5e1',
-        boxSizing: 'border-box'
+        boxSizing: 'border-box',
+        overflow: 'hidden'
       }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
-            <Activity size={15} color={fatigueData.statusName === 'Danger' ? '#ef4444' : fatigueData.statusName === 'Busy' ? '#f97316' : '#10b981'} />
-            <span style={{ fontSize: '0.75rem', fontWeight: '700', color: '#fff' }}>疲労ゲージ</span>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+              <Activity size={15} color={fatigueData.statusName === 'Danger' ? '#ef4444' : fatigueData.statusName === 'Busy' ? '#f97316' : '#10b981'} />
+              <span style={{ fontSize: '0.75rem', fontWeight: '700', color: '#fff' }}>疲労ゲージ</span>
+            </div>
+            {false && (() => {
+              const status = fatigueData.statusName;
+              let bodyColor = '#10b981';
+              let eyeLeft = <circle cx="14" cy="18" r="2" fill="#fff" />;
+              let eyeRight = <circle cx="26" cy="18" r="2" fill="#fff" />;
+              let mouth = <path d="M 18 24 Q 20 27 22 24" stroke="#fff" strokeWidth="2" fill="none" strokeLinecap="round" />;
+              let className = 'pet-bounce';
+
+              if (status === 'Flesh') {
+                bodyColor = '#10b981';
+                className = 'pet-bounce';
+                mouth = <path d="M 18 23 Q 20 26 22 23" stroke="#fff" strokeWidth="2" fill="none" strokeLinecap="round" />;
+              } else if (status === 'Good') {
+                bodyColor = '#34d399';
+                className = 'pet-float';
+                mouth = <path d="M 18 22 Q 20 25 22 22" stroke="#fff" strokeWidth="2" fill="none" strokeLinecap="round" />;
+              } else if (status === 'Chill') {
+                bodyColor = '#38bdf8';
+                className = 'pet-pulse';
+                eyeLeft = <path d="M 12 18 L 16 18" stroke="#fff" strokeWidth="2" strokeLinecap="round" />;
+                eyeRight = <path d="M 24 18 L 28 18" stroke="#fff" strokeWidth="2" strokeLinecap="round" />;
+                mouth = <path d="M 18 23 L 22 23" stroke="#fff" strokeWidth="2" strokeLinecap="round" />;
+              } else if (status === 'Busy') {
+                bodyColor = '#fb923c';
+                className = 'pet-shake';
+                eyeLeft = <circle cx="14" cy="18" r="1.5" fill="#fff" />;
+                eyeRight = <circle cx="26" cy="18" r="1.5" fill="#fff" />;
+                mouth = <path d="M 18 24 L 22 22 L 22 24 L 18 22 Z" fill="#fff" />;
+              } else { // Danger
+                bodyColor = '#f87171';
+                className = 'pet-shake';
+                eyeLeft = <path d="M 12 16 L 16 20 M 16 16 L 12 20" stroke="#fff" strokeWidth="2" strokeLinecap="round" />;
+                eyeRight = <path d="M 24 16 L 28 20 M 28 16 L 24 20" stroke="#fff" strokeWidth="2" fill="none" strokeLinecap="round" />;
+                mouth = <path d="M 17 25 Q 20 21 23 25" stroke="#fff" strokeWidth="2" fill="none" strokeLinecap="round" />;
+              }
+
+              return (
+                <svg className={className} width="40" height="40" viewBox="0 0 40 40" style={{
+                  display: 'inline-block',
+                  verticalAlign: 'middle',
+                  WebkitAppRegion: 'no-drag',
+                  marginTop: '-8px',
+                  marginLeft: '20px'
+                }}>
+                  <path d="M 4 24 C 4 10, 36 10, 36 24 C 36 34, 28 36, 20 36 C 12 36, 4 34, 4 24 Z" fill={bodyColor} />
+                  {(status === 'Flesh' || status === 'Good') && (
+                    <>
+                      <circle cx="9" cy="19" r="2.5" fill="#f472b6" opacity="0.6" />
+                      <circle cx="31" cy="19" r="2.5" fill="#f472b6" opacity="0.6" />
+                    </>
+                  )}
+                  {eyeLeft}
+                  {eyeRight}
+                  {mouth}
+                </svg>
+              );
+            })()}
           </div>
           <div style={{ display: 'flex', gap: '0.3rem', WebkitAppRegion: 'no-drag' }}>
             <button
@@ -1403,14 +1474,76 @@ function App() {
         </div>
 
         <div style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem' }}>
-          <div style={{ display: 'flex', alignItems: 'baseline', gap: '0.5rem' }}>
-            <span style={{ fontSize: '1.25rem', fontWeight: '800', color: fatigueData.statusName === 'Danger' ? '#ef4444' : fatigueData.statusName === 'Busy' ? '#f97316' : '#fff' }}>
-              {fatigueData.statusName}
-            </span>
-            <span style={{ fontSize: '0.7rem', color: '#94a3b8' }}>
-              ({fatigueData.statusName === 'Flesh' ? '集計中. . .' : `${100 - fatigueData.idleRate}%`})
-            </span>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '2rem' }}>
+            <div style={{ display: 'flex', alignItems: 'baseline', gap: '0.5rem' }}>
+              <span style={{ fontSize: '1.25rem', fontWeight: '800', color: fatigueData.statusName === 'Danger' ? '#ef4444' : fatigueData.statusName === 'Busy' ? '#f97316' : '#fff' }}>
+                {fatigueData.statusName}
+              </span>
+              <span style={{ fontSize: '0.7rem', color: '#94a3b8' }}>
+                ({fatigueData.statusName === 'Flesh' ? '集計中. . .' : `${100 - fatigueData.idleRate}%`})
+              </span>
+            </div>
+            <div style={{ width: '40px', height: '40px', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, visibility: settings.show_pet_in_mini === 'true' ? 'visible' : 'hidden' }}>
+              {(() => {
+                const status = fatigueData.statusName;
+                let bodyColor = '#10b981';
+                let eyeLeft = <circle cx="14" cy="18" r="2" fill="#fff" />;
+                let eyeRight = <circle cx="26" cy="18" r="2" fill="#fff" />;
+                let mouth = <path d="M 18 24 Q 20 27 22 24" stroke="#fff" strokeWidth="2" fill="none" strokeLinecap="round" />;
+                let className = 'pet-bounce';
+
+                if (status === 'Flesh') {
+                  bodyColor = '#10b981';
+                  className = 'pet-bounce';
+                  mouth = <path d="M 18 23 Q 20 26 22 23" stroke="#fff" strokeWidth="2" fill="none" strokeLinecap="round" />;
+                } else if (status === 'Good') {
+                  bodyColor = '#34d399';
+                  className = 'pet-float';
+                  mouth = <path d="M 18 22 Q 20 25 22 22" stroke="#fff" strokeWidth="2" fill="none" strokeLinecap="round" />;
+                } else if (status === 'Chill') {
+                  bodyColor = '#38bdf8';
+                  className = 'pet-pulse';
+                  eyeLeft = <path d="M 12 18 L 16 18" stroke="#fff" strokeWidth="2" strokeLinecap="round" />;
+                  eyeRight = <path d="M 24 18 L 28 18" stroke="#fff" strokeWidth="2" strokeLinecap="round" />;
+                  mouth = <path d="M 18 23 L 22 23" stroke="#fff" strokeWidth="2" strokeLinecap="round" />;
+                } else if (status === 'Busy') {
+                  bodyColor = '#fb923c';
+                  className = 'pet-shake';
+                  eyeLeft = <circle cx="14" cy="18" r="1.5" fill="#fff" />;
+                  eyeRight = <circle cx="26" cy="18" r="1.5" fill="#fff" />;
+                  mouth = <path d="M 18 24 L 22 22 L 22 24 L 18 22 Z" fill="#fff" />;
+                } else { // Danger
+                  bodyColor = '#f87171';
+                  className = 'pet-danger-shake';
+                  eyeLeft = <path d="M 12 16 L 16 20 M 16 16 L 12 20" stroke="#fff" strokeWidth="2" strokeLinecap="round" />;
+                  eyeRight = <path d="M 24 16 L 28 20 M 28 16 L 24 20" stroke="#fff" strokeWidth="2" fill="none" strokeLinecap="round" />;
+                  mouth = <path d="M 17 25 Q 20 21 23 25" stroke="#fff" strokeWidth="2" fill="none" strokeLinecap="round" />;
+                }
+
+                return (
+                  <svg className={className} width="40" height="40" viewBox="0 0 40 40" style={{ display: 'inline-block', verticalAlign: 'middle', WebkitAppRegion: 'no-drag' }}>
+                    <path d="M 4 24 C 4 10, 36 10, 36 24 C 36 34, 28 36, 20 36 C 12 36, 4 34, 4 24 Z" fill={bodyColor} />
+                    {(status === 'Flesh' || status === 'Good') && (
+                      <>
+                        <circle cx="9" cy="19" r="2.5" fill="#f472b6" opacity="0.6" />
+                        <circle cx="31" cy="19" r="2.5" fill="#f472b6" opacity="0.6" />
+                      </>
+                    )}
+                    {eyeLeft}
+                    {eyeRight}
+                    {mouth}
+                    {status === 'Danger' && (
+                      <>
+                        <path d="M 31 11 Q 33 13 32 15 Q 31 16 30 14 Q 29 13 31 11 Z" fill="#38bdf8" />
+                        <path d="M 34 14 Q 36 16 35 18 Q 34 19 33 17 Q 32 16 34 14 Z" fill="#38bdf8" />
+                      </>
+                    )}
+                  </svg>
+                );
+              })()}
+            </div>
           </div>
+
           <div style={{ height: '5px', background: 'rgba(255, 255, 255, 0.05)', borderRadius: '2.5px', overflow: 'hidden' }}>
             <div style={{
               height: '100%',
@@ -1444,28 +1577,44 @@ function App() {
                   : "休憩を入れながら\nマイペースに進めましょう！"}
         </div>
 
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderTop: '1px solid rgba(255,255,255,0.05)', paddingTop: '0.35rem', WebkitAppRegion: 'no-drag' }}>
-          <label style={{ display: 'flex', alignItems: 'center', gap: '0.25rem', fontSize: '0.65rem', color: '#94a3b8', cursor: 'pointer' }}>
-            <input
-              type="checkbox"
-              checked={settings.show_mini_on_close === 'true'}
-              onChange={async (e) => {
-                const val = e.target.checked ? 'true' : 'false';
-                handleSaveSetting('show_mini_on_close', val);
-                if (val === 'false' && window.require) {
-                  const { ipcRenderer } = window.require('electron');
-                  await ipcRenderer.invoke('mini-window:close');
-                }
-              }}
-              style={{ width: '12px', height: '12px', accentColor: '#6366f1' }}
-            />
-            <span>メイン画面を閉じたら表示</span>
-          </label>
-          <span style={{ fontSize: '0.65rem', color: '#64748b' }}>
-            稼働: {Math.floor(fatigueData.activeLogs * 10 / 60)}分
-          </span>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem', borderTop: '1px solid rgba(255,255,255,0.05)', paddingTop: '0.35rem', WebkitAppRegion: 'no-drag' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <label style={{ display: 'flex', alignItems: 'center', gap: '0.25rem', fontSize: '0.65rem', color: '#94a3b8', cursor: 'pointer' }}>
+              <input
+                type="checkbox"
+                checked={settings.show_mini_on_close === 'true'}
+                onChange={async (e) => {
+                  const val = e.target.checked ? 'true' : 'false';
+                  handleSaveSetting('show_mini_on_close', val);
+                  if (val === 'false' && window.require) {
+                    const { ipcRenderer } = window.require('electron');
+                    await ipcRenderer.invoke('mini-window:close');
+                  }
+                }}
+                style={{ width: '12px', height: '12px', accentColor: '#6366f1' }}
+              />
+              <span>メイン画面を閉じたら表示</span>
+            </label>
+            <label style={{ display: 'flex', alignItems: 'center', gap: '0.25rem', fontSize: '0.65rem', color: '#94a3b8', cursor: 'pointer' }}>
+              <input
+                type="checkbox"
+                checked={settings.show_pet_in_mini === 'true'}
+                onChange={async (e) => {
+                  const val = e.target.checked ? 'true' : 'false';
+                  handleSaveSetting('show_pet_in_mini', val);
+                }}
+                style={{ width: '12px', height: '12px', accentColor: '#6366f1' }}
+              />
+              <span>ペットを表示</span>
+            </label>
+          </div>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <span style={{ fontSize: '0.65rem', color: '#64748b' }}>
+              稼働: {Math.floor(fatigueData.activeLogs * 10 / 60)}分
+            </span>
+          </div>
         </div>
-      </div>
+      </div >
     );
   }
 

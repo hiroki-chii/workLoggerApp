@@ -241,6 +241,7 @@ body {
     opacity: 0;
     transform: translateY(20px);
   }
+
   to {
     opacity: 1;
     transform: translateY(0);
@@ -940,9 +941,9 @@ body {
 
 /* オートコンプリート時の背景色を無効化 */
 input:-webkit-autofill,
-input:-webkit-autofill:hover, 
-input:-webkit-autofill:focus, 
-input:-webkit-autofill:active{
+input:-webkit-autofill:hover,
+input:-webkit-autofill:focus,
+input:-webkit-autofill:active {
   -webkit-box-shadow: 0 0 0 30px var(--card-bg) inset !important;
   -webkit-text-fill-color: var(--text-main) !important;
   caret-color: var(--text-main) !important;
@@ -953,4 +954,103 @@ input:-webkit-autofill:active{
 select option {
   background-color: var(--bg-dark);
   color: var(--text-main);
+}
+
+/* ペット用のアニメーション定義 */
+.pet-bounce {
+  display: inline-block;
+  animation: petBounce 1s ease-in-out infinite alternate;
+}
+
+@keyframes petBounce {
+  0% {
+    transform: translateY(0);
+  }
+
+  100% {
+    transform: translateY(-8px);
+  }
+}
+
+.pet-float {
+  display: inline-block;
+  animation: petFloat 3s ease-in-out infinite alternate;
+}
+
+@keyframes petFloat {
+  0% {
+    transform: translate(0, 0);
+  }
+
+  100% {
+    transform: translate(0px, -10px);
+  }
+}
+
+.pet-shake {
+  display: inline-block;
+  animation: petShake 1.0s linear infinite;
+}
+
+@keyframes petShake {
+
+  0%,
+  100% {
+    transform: translateX(0);
+  }
+
+  25% {
+    transform: translateX(-5px);
+  }
+
+  50% {
+    transform: translateX(0);
+  }
+
+  75% {
+    transform: translateX(5px);
+  }
+}
+
+.pet-danger-shake {
+  display: inline-block;
+  animation: petDangerShake 0.6s linear infinite;
+}
+
+@keyframes petDangerShake {
+
+  0%,
+  100% {
+    transform: translateX(0);
+  }
+
+  25% {
+    transform: translateX(-6px);
+  }
+
+  50% {
+    transform: translateX(0);
+  }
+
+  75% {
+    transform: translateX(6px);
+  }
+}
+
+
+.pet-pulse {
+  display: inline-block;
+  animation: petPulse 3s ease-in-out infinite alternate;
+}
+
+@keyframes petPulse {
+  0% {
+    transform: scale(0.9);
+    opacity: 0.9;
+  }
+
+  100% {
+    transform: scale(1.15);
+    opacity: 1;
+  }
 }

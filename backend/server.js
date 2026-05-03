@@ -49,6 +49,7 @@ try {
   db.prepare('INSERT OR IGNORE INTO settings (key, value) VALUES (?, ?)').run('default_activity_color', '#6366f1');
   db.prepare('INSERT OR IGNORE INTO settings (key, value) VALUES (?, ?)').run('show_mini_on_close', 'true');
   db.prepare('INSERT OR IGNORE INTO settings (key, value) VALUES (?, ?)').run('mini_window_position', '右下');
+  db.prepare('INSERT OR IGNORE INTO settings (key, value) VALUES (?, ?)').run('show_pet_in_mini', 'true');
   // 既存データがある場合は「右上」を「右下」へ補正
   db.prepare("UPDATE settings SET value = '右下' WHERE key = 'mini_window_position' AND value = '右上'").run();
   console.log('[Server] Database initialized (Better-SQLite3, WAL mode) at: %s', DB_PATH);
