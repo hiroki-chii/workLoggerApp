@@ -38,6 +38,10 @@ import { useTheme } from './ThemeProvider';
 ChartJS.register(ArcElement, Tooltip, Legend);
 
 const API_BASE = 'http://127.0.0.1:3001/api';
+const FATIGUE_ALERT_INTERVAL_MINUTES = 10;
+const DB_NAME = 'logs.db';
+const APP_DIR_NAME = 'workloggerapp';
+
 
 // 当日の週の日曜日から土曜日までの範囲を計算
 const getWeekRange = () => {
@@ -200,7 +204,7 @@ function App() {
         setFatigueData(fData);
         const now = Date.now();
         if (fData.statusName === 'Danger') {
-          if (prevStatusRef.current !== 'Danger' || now - lastAlertTimeRef.current >= 10 * 60 * 1000) {
+          if (prevStatusRef.current !== 'Danger' || now - lastAlertTimeRef.current >= FATIGUE_ALERT_INTERVAL_MINUTES * 60 * 1000) {
             lastAlertTimeRef.current = now;
             const requiredExpectedLogs = Math.ceil(fData.activeLogs / 0.855);
             const diffLogs = Math.max(0, requiredExpectedLogs - fData.expectedLogs);
@@ -1228,12 +1232,6 @@ function App() {
                       </button>
                     </div>
                   </div>
-
-                  <div style={{ marginTop: '2rem', padding: '1.5rem', border: '1px dashed rgba(255,255,255,0.1)', borderRadius: '16px', textAlign: 'center' }}>
-                    <p style={{ color: '#64748b', fontSize: '0.85rem' }}>
-                      その他の詳細設定（通知、非稼働時間の除外など）は今後のアップデートで追加予定です。
-                    </p>
-                  </div>
                 </div>
               </section>
             </div>
@@ -1254,7 +1252,7 @@ function App() {
                     <h3>1. 自動記録</h3>
                     <p>
                       アプリを起動すると、アクティブなウィンドウの名前を定期的にバックグラウンドで記録します。
-                      サイドバーの「記録を開始」ボタンを押すことで、収集が始まります。
+                      サイドバーの「記録を開始 / 記録を停止」ボタンで収集を開始および停止できます。
                     </p>
                     <p style={{ fontSize: '0.8rem', marginTop: '0.5rem', color: 'var(--text-muted)' }}>
                       ※記録する間隔や無操作（アイドル）と判定するまでの秒数は、設定画面から自由に変更できます。
@@ -1282,7 +1280,7 @@ function App() {
                     <h3>4. ミニ画面と疲労状態・稼働率</h3>
                     <p>
                       当日の稼働開始時刻とサンプリング数に基づき、リアルタイムに「疲労状態（Chill/Good/Busy/Danger）」を自動算出。
-                      疲労状態が **Danger**（危険）のときは、10分おきに休憩を促す警告アラートを画面上に通知します。
+                      疲労状態が <strong>Danger（危険）</strong>のときは、{FATIGUE_ALERT_INTERVAL_MINUTES}分おきに休憩を促す警告アラートを画面上に通知します。
                       さらにメイン画面や疲労度カードにある「メイン画面を閉じたら表示」をオンにすることで、親画面を閉じた際に、疲労状態や稼働率を常時把握できるコンパクトなミニ画面（ウィジェット）をデスクトップ上に自動表示できます。
                     </p>
                   </div>
@@ -1306,13 +1304,13 @@ function App() {
                       <li><strong>データの保存場所:</strong> 本アプリに関するすべてのデータは、お使いのPCの以下のディレクトリに保存されます。
                         <div style={{ marginTop: '0.8rem', padding: '1rem', background: 'rgba(0,0,0,0.2)', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.05)' }}>
                           <div style={{ marginBottom: '0.8rem' }}>
-                            <span style={{ fontSize: '0.8rem', color: '#94a3b8', display: 'block', marginBottom: '0.2rem' }}>■ メインデータベース (logs.db)</span>
-                            <code style={{ fontSize: '0.8rem', color: 'var(--primary)', wordBreak: 'break-all' }}>%APPDATA%\workloggerapp\logs.db</code>
+                            <span style={{ fontSize: '0.8rem', color: '#94a3b8', display: 'block', marginBottom: '0.2rem' }}>■ メインデータベース ({DB_NAME})</span>
+                            <code style={{ fontSize: '0.8rem', color: 'var(--primary)', wordBreak: 'break-all' }}>{`%APPDATA%\\${APP_DIR_NAME}\\${DB_NAME}`}</code>
                             <p style={{ fontSize: '0.75rem', color: '#64748b', marginTop: '0.2rem' }}>※作業履歴データ、環境設定、表示名変更ルールが保存されます。</p>
                           </div>
                           <div style={{ marginBottom: '0.8rem' }}>
                             <span style={{ fontSize: '0.8rem', color: '#94a3b8', display: 'block', marginBottom: '0.2rem' }}>■ アプリケーション設定・キャッシュ</span>
-                            <code style={{ fontSize: '0.8rem', color: 'var(--primary)', wordBreak: 'break-all' }}>%APPDATA%\workloggerapp\</code>
+                            <code style={{ fontSize: '0.8rem', color: 'var(--primary)', wordBreak: 'break-all' }}>{`%APPDATA%\\${APP_DIR_NAME}\\`}</code>
                             <p style={{ fontSize: '0.75rem', color: '#64748b', marginTop: '0.2rem' }}>※テーマ設定（ダーク/ライト）やウィンドウの状態、一時ファイルが保存されます。</p>
                           </div>
                           <div>
