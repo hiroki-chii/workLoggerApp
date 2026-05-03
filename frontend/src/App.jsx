@@ -1404,27 +1404,27 @@ function App() {
               let mouth = <path d="M 18 24 Q 20 27 22 24" stroke="#fff" strokeWidth="2" fill="none" strokeLinecap="round" />;
               let className = 'pet-bounce';
 
-              if (status === 'Flesh') {
+              if (status === 'Restored') {
                 bodyColor = '#10b981';
                 className = 'pet-bounce';
                 mouth = <path d="M 18 23 Q 20 26 22 23" stroke="#fff" strokeWidth="2" fill="none" strokeLinecap="round" />;
-              } else if (status === 'Good') {
+              } else if (status === 'Focused') {
                 bodyColor = '#34d399';
                 className = 'pet-float';
                 mouth = <path d="M 18 22 Q 20 25 22 22" stroke="#fff" strokeWidth="2" fill="none" strokeLinecap="round" />;
-              } else if (status === 'Chill') {
+              } else if (status === 'Balanced') {
                 bodyColor = '#38bdf8';
                 className = 'pet-pulse';
                 eyeLeft = <path d="M 12 18 L 16 18" stroke="#fff" strokeWidth="2" strokeLinecap="round" />;
                 eyeRight = <path d="M 24 18 L 28 18" stroke="#fff" strokeWidth="2" strokeLinecap="round" />;
                 mouth = <path d="M 18 23 L 22 23" stroke="#fff" strokeWidth="2" strokeLinecap="round" />;
-              } else if (status === 'Busy') {
+              } else if (status === 'Strained') {
                 bodyColor = '#fb923c';
                 className = 'pet-shake';
                 eyeLeft = <circle cx="14" cy="18" r="1.5" fill="#fff" />;
                 eyeRight = <circle cx="26" cy="18" r="1.5" fill="#fff" />;
                 mouth = <path d="M 18 24 L 22 22 L 22 24 L 18 22 Z" fill="#fff" />;
-              } else { // Danger
+              } else { // Critical
                 bodyColor = '#f87171';
                 className = 'pet-shake';
                 eyeLeft = <path d="M 12 16 L 16 20 M 16 16 L 12 20" stroke="#fff" strokeWidth="2" strokeLinecap="round" />;
@@ -1441,7 +1441,7 @@ function App() {
                   marginLeft: '20px'
                 }}>
                   <path d="M 4 24 C 4 10, 36 10, 36 24 C 36 34, 28 36, 20 36 C 12 36, 4 34, 4 24 Z" fill={bodyColor} />
-                  {(status === 'Flesh' || status === 'Good') && (
+                  {(status === 'Restored' || status === 'Focused') && (
                     <>
                       <circle cx="9" cy="19" r="2.5" fill="#f472b6" opacity="0.6" />
                       <circle cx="31" cy="19" r="2.5" fill="#f472b6" opacity="0.6" />
@@ -1497,27 +1497,27 @@ function App() {
                 let mouth = <path d="M 18 24 Q 20 27 22 24" stroke="#fff" strokeWidth="2" fill="none" strokeLinecap="round" />;
                 let className = 'pet-bounce';
 
-                if (status === 'Flesh') {
+                if (status === 'Restored') {
                   bodyColor = '#10b981';
                   className = 'pet-bounce';
                   mouth = <path d="M 18 23 Q 20 26 22 23" stroke="#fff" strokeWidth="2" fill="none" strokeLinecap="round" />;
-                } else if (status === 'Good') {
+                } else if (status === 'Focused') {
                   bodyColor = '#34d399';
                   className = 'pet-float';
                   mouth = <path d="M 18 22 Q 20 25 22 22" stroke="#fff" strokeWidth="2" fill="none" strokeLinecap="round" />;
-                } else if (status === 'Chill') {
+                } else if (status === 'Balanced') {
                   bodyColor = '#38bdf8';
                   className = 'pet-pulse';
                   eyeLeft = <path d="M 12 18 L 16 18" stroke="#fff" strokeWidth="2" strokeLinecap="round" />;
                   eyeRight = <path d="M 24 18 L 28 18" stroke="#fff" strokeWidth="2" strokeLinecap="round" />;
                   mouth = <path d="M 18 23 L 22 23" stroke="#fff" strokeWidth="2" strokeLinecap="round" />;
-                } else if (status === 'Busy') {
+                } else if (status === 'Strained') {
                   bodyColor = '#fb923c';
                   className = 'pet-shake';
                   eyeLeft = <circle cx="14" cy="18" r="1.5" fill="#fff" />;
                   eyeRight = <circle cx="26" cy="18" r="1.5" fill="#fff" />;
                   mouth = <path d="M 18 24 L 22 22 L 22 24 L 18 22 Z" fill="#fff" />;
-                } else { // Danger
+                } else { // Critical
                   bodyColor = '#f87171';
                   className = 'pet-danger-shake';
                   eyeLeft = <path d="M 12 16 L 16 20 M 16 16 L 12 20" stroke="#fff" strokeWidth="2" strokeLinecap="round" />;
@@ -1528,7 +1528,7 @@ function App() {
                 return (
                   <svg className={className} width="40" height="40" viewBox="0 0 40 40" style={{ display: 'inline-block', verticalAlign: 'middle', WebkitAppRegion: 'no-drag' }}>
                     <path d="M 4 24 C 4 10, 36 10, 36 24 C 36 34, 28 36, 20 36 C 12 36, 4 34, 4 24 Z" fill={bodyColor} />
-                    {(status === 'Flesh' || status === 'Good') && (
+                    {(status === 'Restored' || status === 'Focused') && (
                       <>
                         <circle cx="9" cy="19" r="2.5" fill="#f472b6" opacity="0.6" />
                         <circle cx="31" cy="19" r="2.5" fill="#f472b6" opacity="0.6" />
@@ -1537,7 +1537,7 @@ function App() {
                     {eyeLeft}
                     {eyeRight}
                     {mouth}
-                    {status === 'Danger' && (
+                    {status === 'Critical' && (
                       <>
                         <path d="M 31 11 Q 33 13 32 15 Q 31 16 30 14 Q 29 13 31 11 Z" fill="#38bdf8" />
                         <path d="M 34 14 Q 36 16 35 18 Q 34 19 33 17 Q 32 16 34 14 Z" fill="#38bdf8" />
