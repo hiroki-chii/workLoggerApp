@@ -123,6 +123,15 @@ const formatNumberWithSuffix = (num) => {
   return `${ceiled.toFixed(1)}${unit}`;
 };
 
+const getFatigueAdvice = (statusName) => {
+  if (statusName === 'Critical') return "少し頑張りすぎていませんか？\nそろそろ小休憩を！";
+  if (statusName === 'Strained') return "そろそろ疲れていませんか？\n適度に水分補給を！";
+  if (statusName === 'Focused') return "良いバランスです。\nこの調子で進めましょう！";
+  if (statusName === 'Balanced') return "休憩を入れながら\nマイペースに進めましょう！";
+  if (statusName === 'Restored') return "新鮮な気持ちで進めていきましょう！！";
+  return "稼働データの集計を開始しました。\n今日も一日頑張りましょう！！";
+};
+
 function App() {
   const [stats, setStats] = useState([]);
   const [totalAppsCount, setTotalAppsCount] = useState(0);
@@ -203,8 +212,8 @@ function App() {
         const fData = await fatigueRes.json();
         setFatigueData(fData);
         const now = Date.now();
-        if (fData.statusName === 'Danger') {
-          if (prevStatusRef.current !== 'Danger' || now - lastAlertTimeRef.current >= FATIGUE_ALERT_INTERVAL_MINUTES * 60 * 1000) {
+        if (fData.statusName === 'Critical') {
+          if (prevStatusRef.current !== 'Critical' || now - lastAlertTimeRef.current >= FATIGUE_ALERT_INTERVAL_MINUTES * 60 * 1000) {
             lastAlertTimeRef.current = now;
             const requiredExpectedLogs = Math.ceil(fData.activeLogs / 0.855);
             const diffLogs = Math.max(0, requiredExpectedLogs - fData.expectedLogs);
@@ -682,7 +691,7 @@ function App() {
                 <div className="card" style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
                   <div className="card-title" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.5rem', marginBottom: 0 }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                      <Activity size={20} color={fatigueData.statusName === 'Danger' ? '#ef4444' : fatigueData.statusName === 'Busy' ? '#f97316' : '#10b981'} />
+                      <Activity size={20} color={fatigueData.statusName === 'Critical' ? '#ef4444' : fatigueData.statusName === 'Strained' ? '#f97316' : '#10b981'} />
                       <span>疲労ゲージ</span>
                     </div>
                     <div style={{ display: 'flex', gap: '0.6rem', alignItems: 'center', flexWrap: 'wrap' }}>
@@ -727,19 +736,19 @@ function App() {
 
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem', flex: 1, justifyContent: 'center' }}>
                     <div style={{ display: 'flex', alignItems: 'baseline', gap: '0.5rem' }}>
-                      <span style={{ fontSize: '2rem', fontWeight: '800', color: fatigueData.statusName === 'Danger' ? '#ef4444' : fatigueData.statusName === 'Busy' ? '#f97316' : 'var(--text)' }}>
+                      <span style={{ fontSize: '2rem', fontWeight: '800', color: fatigueData.statusName === 'Critical' ? '#ef4444' : fatigueData.statusName === 'Strained' ? '#f97316' : 'var(--text)' }}>
                         {fatigueData.statusName}
                       </span>
                       <span style={{ fontSize: '0.85rem', color: '#94a3b8' }}>
-                        (稼働率 {fatigueData.statusName === 'Flesh' ? '集計中. . .' : `${100 - fatigueData.idleRate}%`})
+                        (稼働率 {fatigueData.statusName === 'Calculating' ? '集計中. . .' : `${100 - fatigueData.idleRate}%`})
                       </span>
                     </div>
 
                     <div style={{ height: '8px', background: 'rgba(255, 255, 255, 0.05)', borderRadius: '4px', overflow: 'hidden' }}>
                       <div style={{
                         height: '100%',
-                        width: `${fatigueData.statusName === 'Flesh' ? 0 : 100 - fatigueData.idleRate}%`,
-                        background: fatigueData.statusName === 'Danger' ? 'linear-gradient(90deg, #ef4444, #f87171)' : fatigueData.statusName === 'Busy' ? 'linear-gradient(90deg, #f97316, #fb923c)' : 'linear-gradient(90deg, #10b981, #34d399)',
+                        width: `${fatigueData.statusName === 'Calculating' ? 0 : 100 - fatigueData.idleRate}%`,
+                        background: fatigueData.statusName === 'Critical' ? 'linear-gradient(90deg, #ef4444, #f87171)' : fatigueData.statusName === 'Strained' ? 'linear-gradient(90deg, #f97316, #fb923c)' : 'linear-gradient(90deg, #10b981, #34d399)',
                         borderRadius: '4px',
                         transition: 'width 0.5s ease'
                       }} />
@@ -768,24 +777,16 @@ function App() {
 
                     <div style={{
                       padding: '0.65rem 0.85rem',
-                      background: fatigueData.statusName === 'Danger' ? 'rgba(239, 68, 68, 0.1)' : fatigueData.statusName === 'Busy' ? 'rgba(249, 115, 22, 0.1)' : 'rgba(16, 185, 129, 0.1)',
-                      border: fatigueData.statusName === 'Danger' ? '1px solid rgba(239, 68, 68, 0.2)' : fatigueData.statusName === 'Busy' ? '1px solid rgba(249, 115, 22, 0.2)' : '1px solid rgba(16, 185, 129, 0.2)',
+                      background: fatigueData.statusName === 'Critical' ? 'rgba(239, 68, 68, 0.1)' : fatigueData.statusName === 'Strained' ? 'rgba(249, 115, 22, 0.1)' : 'rgba(16, 185, 129, 0.1)',
+                      border: fatigueData.statusName === 'Critical' ? '1px solid rgba(239, 68, 68, 0.2)' : fatigueData.statusName === 'Strained' ? '1px solid rgba(249, 115, 22, 0.2)' : '1px solid rgba(16, 185, 129, 0.2)',
                       borderRadius: '12px',
-                      color: fatigueData.statusName === 'Danger' ? '#f87171' : fatigueData.statusName === 'Busy' ? '#fb923c' : '#34d399',
+                      color: fatigueData.statusName === 'Critical' ? '#f87171' : fatigueData.statusName === 'Strained' ? '#fb923c' : '#34d399',
                       fontSize: '0.85rem',
                       fontWeight: '600',
                       lineHeight: '1.4',
                       whiteSpace: 'pre-line'
                     }}>
-                      {fatigueData.statusName === 'Danger'
-                        ? "少し頑張りすぎていませんか？\nそろそろ小休憩を！"
-                        : fatigueData.statusName === 'Busy'
-                          ? "そろそろ疲れていませんか？\n適度に水分補給を！"
-                          : fatigueData.statusName === 'Good'
-                            ? "良いバランスです。\nこの調子で進めましょう！"
-                            : fatigueData.statusName === 'Flesh'
-                              ? "今日も一日頑張りましょう！！"
-                              : "休憩を入れながら\nマイペースに進めましょう！"}
+                      {getFatigueAdvice(fatigueData.statusName)}
                     </div>
                   </div>
                 </div>
@@ -1281,9 +1282,11 @@ function App() {
 
                     <h3>4. ミニ画面と疲労状態・稼働率</h3>
                     <p>
-                      当日の稼働開始時刻とサンプリング数に基づき、リアルタイムに「疲労状態（Chill/Good/Busy/Danger）」を自動算出。
-                      疲労状態が <strong>Danger（危険）</strong>のときは、{FATIGUE_ALERT_INTERVAL_MINUTES}分おきに休憩を促す警告アラートを画面上に通知します。
-                      さらにメイン画面や疲労度カードにある「メイン画面を閉じたら表示」をオンにすることで、親画面を閉じた際に、疲労状態や稼働率を常時把握できるコンパクトなミニ画面（ウィジェット）をデスクトップ上に自動表示できます。
+                      <strong>90分スライディングウィンドウ方式</strong>に基づき、直近90分間の活動状況からリアルタイムに疲労状態（Restored / Balanced / Focused / Strained / Critical）を自動算出します。過去の休息履歴に影響されず、直近の過集中を正確に検知可能です。最初の30分間は <strong>Calculating（集計中）</strong>と表示されます。
+                    </p>
+                    <p>
+                      疲労状態が <strong>Critical（限界）</strong>のときは、{FATIGUE_ALERT_INTERVAL_MINUTES}分おきに休憩を促す警告アラートを画面上に通知します。
+                      さらにメイン画面にある「メイン画面を閉じたら表示」をオンにすることで、親画面を閉じた際に、疲労状態や稼働率を常時把握できるコンパクトなミニ画面（ウィジェット）をデスクトップ上に自動表示できます。
                     </p>
                   </div>
                 </section>
@@ -1390,7 +1393,7 @@ function App() {
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
-              <Activity size={15} color={fatigueData.statusName === 'Danger' ? '#ef4444' : fatigueData.statusName === 'Busy' ? '#f97316' : '#10b981'} />
+              <Activity size={15} color={fatigueData.statusName === 'Critical' ? '#ef4444' : fatigueData.statusName === 'Strained' ? '#f97316' : '#10b981'} />
               <span style={{ fontSize: '0.75rem', fontWeight: '700', color: '#fff' }}>疲労ゲージ</span>
             </div>
             {false && (() => {
@@ -1478,11 +1481,11 @@ function App() {
         <div style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '2rem' }}>
             <div style={{ display: 'flex', alignItems: 'baseline', gap: '0.5rem' }}>
-              <span style={{ fontSize: '1.25rem', fontWeight: '800', color: fatigueData.statusName === 'Danger' ? '#ef4444' : fatigueData.statusName === 'Busy' ? '#f97316' : '#fff' }}>
+              <span style={{ fontSize: '1.25rem', fontWeight: '800', color: fatigueData.statusName === 'Critical' ? '#ef4444' : fatigueData.statusName === 'Strained' ? '#f97316' : '#fff' }}>
                 {fatigueData.statusName}
               </span>
               <span style={{ fontSize: '0.7rem', color: '#94a3b8' }}>
-                ({fatigueData.statusName === 'Flesh' ? '集計中. . .' : `${100 - fatigueData.idleRate}%`})
+                ({fatigueData.statusName === 'Calculating' ? '集計中. . .' : `${100 - fatigueData.idleRate}%`})
               </span>
             </div>
             <div style={{ width: '40px', height: '40px', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, visibility: settings.show_pet_in_mini === 'true' ? 'visible' : 'hidden' }}>
@@ -1549,8 +1552,8 @@ function App() {
           <div style={{ height: '5px', background: 'rgba(255, 255, 255, 0.05)', borderRadius: '2.5px', overflow: 'hidden' }}>
             <div style={{
               height: '100%',
-              width: `${fatigueData.statusName === 'Flesh' ? 0 : 100 - fatigueData.idleRate}%`,
-              background: fatigueData.statusName === 'Danger' ? 'linear-gradient(90deg, #ef4444, #f87171)' : fatigueData.statusName === 'Busy' ? 'linear-gradient(90deg, #f97316, #fb923c)' : 'linear-gradient(90deg, #10b981, #34d399)',
+              width: `${fatigueData.statusName === 'Calculating' ? 0 : 100 - fatigueData.idleRate}%`,
+              background: fatigueData.statusName === 'Critical' ? 'linear-gradient(90deg, #ef4444, #f87171)' : fatigueData.statusName === 'Strained' ? 'linear-gradient(90deg, #f97316, #fb923c)' : 'linear-gradient(90deg, #10b981, #34d399)',
               borderRadius: '2.5px',
               transition: 'width 0.5s ease'
             }} />
@@ -1559,24 +1562,16 @@ function App() {
 
         <div style={{
           fontSize: '0.65rem',
-          color: fatigueData.statusName === 'Danger' ? '#f87171' : fatigueData.statusName === 'Busy' ? '#fb923c' : '#34d399',
-          background: fatigueData.statusName === 'Danger' ? 'rgba(239, 68, 68, 0.1)' : fatigueData.statusName === 'Busy' ? 'rgba(249, 115, 22, 0.1)' : 'rgba(16, 185, 129, 0.1)',
-          border: fatigueData.statusName === 'Danger' ? '1px solid rgba(239, 68, 68, 0.2)' : fatigueData.statusName === 'Busy' ? '1px solid rgba(249, 115, 22, 0.2)' : '1px solid rgba(16, 185, 129, 0.2)',
+          color: fatigueData.statusName === 'Critical' ? '#f87171' : fatigueData.statusName === 'Strained' ? '#fb923c' : '#34d399',
+          background: fatigueData.statusName === 'Critical' ? 'rgba(239, 68, 68, 0.1)' : fatigueData.statusName === 'Strained' ? 'rgba(249, 115, 22, 0.1)' : 'rgba(16, 185, 129, 0.1)',
+          border: fatigueData.statusName === 'Critical' ? '1px solid rgba(239, 68, 68, 0.2)' : fatigueData.statusName === 'Strained' ? '1px solid rgba(249, 115, 22, 0.2)' : '1px solid rgba(16, 185, 129, 0.2)',
           padding: '0.25rem 0.4rem',
           borderRadius: '6px',
           lineHeight: '1.25',
           fontWeight: '500',
           whiteSpace: 'pre-line'
         }}>
-          {fatigueData.statusName === 'Danger'
-            ? "少し頑張りすぎていませんか？\nそろそろ小休憩を！"
-            : fatigueData.statusName === 'Busy'
-              ? "そろそろ疲れていませんか？\n適度に水分補給を！"
-              : fatigueData.statusName === 'Good'
-                ? "良いバランスです。\nこの調子で進めましょう！"
-                : fatigueData.statusName === 'Flesh'
-                  ? "今日も一日頑張りましょう！！"
-                  : "休憩を入れながら\nマイペースに進めましょう！"}
+          {getFatigueAdvice(fatigueData.statusName)}
         </div>
 
         <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem', borderTop: '1px solid rgba(255,255,255,0.05)', paddingTop: '0.35rem', WebkitAppRegion: 'no-drag' }}>

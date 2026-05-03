@@ -174,27 +174,39 @@ app.get('/api/fatigue', (req, res) => {
     const nowMs = Date.now();
     const elapsedSeconds = Math.max(0, Math.floor((nowMs - startMs) / 1000));
 
-    console.log('[Fatigue DEBUG] logInfo.startTime:', logInfo.startTime, 'startTimeISO:', startTimeISO);
-    console.log('[Fatigue DEBUG] startMs:', startMs, 'nowMs:', nowMs, 'elapsedSeconds:', elapsedSeconds);
+    // 2. 直近90分間のスライディングウィンドウ
+    const windowStartMs = nowMs - 90 * 60 * 1000;
+    const startTimeInWindowMs = Math.max(startMs, windowStartMs);
+    const elapsedInWindowSeconds = Math.max(0, Math.floor((nowMs - startTimeInWindowMs) / 1000));
 
+    // 直近90分間かつ本日分の有効ログ数を取得
+    const windowActiveLogsObj = db.prepare(`
+      SELECT COUNT(*) as activeLogsInWindow
+      FROM logs
+      WHERE date(timestamp, 'localtime') = date('now', 'localtime')
+        AND timestamp >= datetime('now', '-90 minutes')
+    `).get();
+
+    const activeLogsInWindow = windowActiveLogsObj ? windowActiveLogsObj.activeLogsInWindow : 0;
     const samplingInterval = 10;
-    const expectedLogs = Math.max(1, Math.floor(elapsedSeconds / samplingInterval));
+    const expectedLogsInWindow = Math.max(1, Math.floor(elapsedInWindowSeconds / samplingInterval));
 
-    // アイドル率 = (予想されるログ数 - 実際のログ数) / 予想されるログ数
-    const idleRatePercent = Math.max(0, Math.min(100, Math.round(((expectedLogs - logInfo.activeLogs) / expectedLogs) * 100)));
-    console.log('[Fatigue DEBUG] expectedLogs:', expectedLogs, 'activeLogs:', logInfo.activeLogs, 'idleRatePercent:', idleRatePercent);
+    // ウィンドウ内アイドル率を計算
+    const idleRatePercent = Math.max(0, Math.min(100, Math.round(((expectedLogsInWindow - activeLogsInWindow) / expectedLogsInWindow) * 100)));
 
-    let statusName = 'Danger';
-    if (elapsedSeconds < 3000) {
-      statusName = 'Flesh';
-    } else if (idleRatePercent >= 30) {
-      statusName = 'Chill';
+    let statusName = 'Critical';
+    if (elapsedInWindowSeconds < 1800) {
+      statusName = 'Calculating'; // ウィンドウ内の経過時間が30分未満の場合
+    } else if (idleRatePercent >= 40) {
+      statusName = 'Restored';
+    } else if (idleRatePercent >= 25) {
+      statusName = 'Balanced';
     } else if (idleRatePercent >= 15) {
-      statusName = 'Good';
+      statusName = 'Focused';
     } else if (idleRatePercent >= 10) {
-      statusName = 'Busy';
+      statusName = 'Strained';
     } else {
-      statusName = 'Danger';
+      statusName = 'Critical';
     }
 
     // 疲労度 = 100 - アイドル率 (%)
@@ -204,10 +216,11 @@ app.get('/api/fatigue', (req, res) => {
       fatigueLevel,
       idleRate: idleRatePercent,
       statusName,
+      isInitialGracePeriod: elapsedInWindowSeconds < 1800,
       startTime: startTimeISO,
       elapsedSeconds,
       activeLogs: logInfo.activeLogs,
-      expectedLogs
+      expectedLogs: Math.max(1, Math.floor(elapsedSeconds / samplingInterval))
     });
   } catch (err) {
     console.error('[Server] Fatigue error:', err);
