@@ -23,7 +23,7 @@ function getSettings() {
     const settings = {};
     rows.forEach(r => { settings[r.key] = r.value; });
     return {
-      interval: 10 * 1000,
+      interval: parseInt(settings.sampling_interval || 10) * 1000,
       idleThreshold: parseInt(settings.idle_threshold || 300)
     };
   } catch (err) {
