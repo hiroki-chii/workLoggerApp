@@ -33,28 +33,18 @@ function startApp() {
     const miniH = 160;
 
     let x = width - miniW - 20;
-    let y = 20;
+    let y = height - miniH - 20;
 
     try {
       const Database = require('better-sqlite3');
       const db = new Database(DB_PATH);
-      const posObj = db.prepare('SELECT value FROM settings WHERE key = ?').get('mini_window_position');
+      const xObj = db.prepare('SELECT value FROM settings WHERE key = ?').get('mini_window_x');
+      const yObj = db.prepare('SELECT value FROM settings WHERE key = ?').get('mini_window_y');
       db.close();
 
-      const position = posObj ? posObj.value : '右上';
-
-      if (position === '左上') {
-        x = 20;
-        y = 20;
-      } else if (position === '右上') {
-        x = width - miniW - 20;
-        y = 20;
-      } else if (position === '左下') {
-        x = 20;
-        y = height - miniH - 20;
-      } else if (position === '右下') {
-        x = width - miniW - 20;
-        y = height - miniH - 20;
+      if (xObj && yObj) {
+        x = parseInt(xObj.value, 10);
+        y = parseInt(yObj.value, 10);
       }
     } catch (err) {
       console.error('[Main] Failed to read mini window position:', err);
@@ -84,6 +74,20 @@ function startApp() {
       : `file://${path.join(PROJECT_ROOT, 'frontend/dist/index.html')}?mini=true`;
 
     miniWindow.loadURL(miniUrl);
+
+    miniWindow.on('move', () => {
+      try {
+        const [mx, my] = miniWindow.getPosition();
+        const Database = require('better-sqlite3');
+        const db = new Database(DB_PATH);
+        db.prepare('INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)').run('mini_window_x', mx.toString());
+        db.prepare('INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)').run('mini_window_y', my.toString());
+        db.close();
+      } catch (err) {
+        console.error('[Main] Failed to save mini window position:', err);
+      }
+    });
+
     miniWindow.on('closed', () => {
       miniWindow = null;
     });

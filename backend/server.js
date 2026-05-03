@@ -148,16 +148,13 @@ app.delete('/api/logs/clear', (req, res) => {
 
 app.get('/api/fatigue', (req, res) => {
   try {
-    const todayLocal = new Date().toLocaleDateString('en-CA');
-    const todayUTC = new Date().toISOString().split('T')[0];
-
     const logInfo = db.prepare(`
       SELECT 
         MIN(timestamp) as startTime, 
         COUNT(*) as activeLogs 
       FROM logs 
-      WHERE timestamp LIKE ? OR timestamp LIKE ?
-    `).get(`${todayLocal}%`, `${todayUTC}%`);
+      WHERE date(timestamp, 'localtime') = date('now', 'localtime')
+    `).get();
 
     if (!logInfo || !logInfo.startTime || logInfo.activeLogs === 0) {
       return res.json({
@@ -187,7 +184,7 @@ app.get('/api/fatigue', (req, res) => {
     console.log('[Fatigue DEBUG] expectedLogs:', expectedLogs, 'activeLogs:', logInfo.activeLogs, 'idleRatePercent:', idleRatePercent);
 
     let statusName = 'Danger';
-    if (elapsedSeconds < 3600) {
+    if (elapsedSeconds < 3000) {
       statusName = 'Flesh';
     } else if (idleRatePercent >= 30) {
       statusName = 'Chill';
@@ -219,14 +216,7 @@ app.get('/api/fatigue', (req, res) => {
 
 app.post('/api/fatigue/reset', (req, res) => {
   try {
-    const todayLocal = new Date().toLocaleDateString('en-CA');
-    const todayUTC = new Date().toISOString().split('T')[0];
-
-    db.prepare("DELETE FROM logs WHERE timestamp LIKE ? OR timestamp LIKE ?").run(
-      `${todayLocal}%`,
-      `${todayUTC}%`
-    );
-
+    db.prepare("DELETE FROM logs WHERE date(timestamp, 'localtime') = date('now', 'localtime')").run();
     res.json({ success: true });
   } catch (err) {
     console.error('[Server] Reset fatigue error:', err);
@@ -237,10 +227,8 @@ app.post('/api/fatigue/reset', (req, res) => {
 app.get('/api/debug-db', (req, res) => {
   try {
     const logs = db.prepare("SELECT timestamp FROM logs ORDER BY timestamp DESC LIMIT 20").all();
-    const todayLocal = new Date().toLocaleDateString('en-CA');
-    const todayUTC = new Date().toISOString().split('T')[0];
-    const matchCount = db.prepare("SELECT COUNT(*) as c FROM logs WHERE timestamp LIKE ? OR timestamp LIKE ?").get(`${todayLocal}%`, `${todayUTC}%`).c;
-    res.json({ logs, todayLocal, todayUTC, matchCount });
+    const matchCount = db.prepare("SELECT COUNT(*) as c FROM logs WHERE date(timestamp, 'localtime') = date('now', 'localtime')").get().c;
+    res.json({ logs, matchCount });
   } catch (err) {
     res.json({ error: err.message });
   }

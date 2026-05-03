@@ -142,6 +142,7 @@ function App() {
   const [activeTab, setActiveTab] = useState('dashboard');
   const timetableContainerRef = useRef(null);
   const prevStatusRef = useRef(null);
+  const lastAlertTimeRef = useRef(0);
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const [isRecording, setIsRecording] = useState(false);
   const { theme, setTheme, resolvedTheme } = useTheme();
@@ -197,23 +198,29 @@ function App() {
       if (fatigueRes && fatigueRes.ok) {
         const fData = await fatigueRes.json();
         setFatigueData(fData);
-        if (fData.statusName === 'Danger' && prevStatusRef.current && prevStatusRef.current !== 'Danger') {
-          const requiredExpectedLogs = Math.ceil(fData.activeLogs / 0.855);
-          const diffLogs = Math.max(0, requiredExpectedLogs - fData.expectedLogs);
-          const requiredSeconds = diffLogs * 10;
-          const requiredMinutes = requiredSeconds / 60;
-          const restMinutes = Math.ceil(requiredMinutes / 10) * 10;
-          const finalMinutes = restMinutes > 0 ? restMinutes : 10;
-          const message = `長時間の作業お疲れ様です。${finalMinutes}分ほど休憩を取りませんか？`;
+        const now = Date.now();
+        if (fData.statusName === 'Danger') {
+          if (prevStatusRef.current !== 'Danger' || now - lastAlertTimeRef.current >= 10 * 60 * 1000) {
+            lastAlertTimeRef.current = now;
+            const requiredExpectedLogs = Math.ceil(fData.activeLogs / 0.855);
+            const diffLogs = Math.max(0, requiredExpectedLogs - fData.expectedLogs);
+            const requiredSeconds = diffLogs * 10;
+            const requiredMinutes = requiredSeconds / 60;
+            const restMinutes = Math.ceil(requiredMinutes / 10) * 10;
+            const finalMinutes = restMinutes > 0 ? restMinutes : 10;
+            const message = `長時間の作業お疲れ様です。${finalMinutes}分ほど休憩を取りませんか？`;
 
-          if (window.require) {
-            const { ipcRenderer } = window.require('electron');
-            ipcRenderer.invoke('alert:danger', message);
-          } else if (typeof window !== 'undefined' && window.Notification) {
-            new window.Notification("WorkPulse からのお知らせ", {
-              body: message
-            });
+            if (window.require) {
+              const { ipcRenderer } = window.require('electron');
+              ipcRenderer.invoke('alert:danger', message);
+            } else if (typeof window !== 'undefined' && window.Notification) {
+              new window.Notification("WorkPulse からのお知らせ", {
+                body: message
+              });
+            }
           }
+        } else {
+          lastAlertTimeRef.current = 0;
         }
         prevStatusRef.current = fData.statusName;
       }
@@ -669,12 +676,28 @@ function App() {
                 </div>
 
                 <div className="card" style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-                  <div className="card-title" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 0 }}>
+                  <div className="card-title" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.5rem', marginBottom: 0 }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                       <Activity size={20} color={fatigueData.statusName === 'Danger' ? '#ef4444' : fatigueData.statusName === 'Busy' ? '#f97316' : '#10b981'} />
-                      <span>疲労状態</span>
+                      <span>疲労ゲージ</span>
                     </div>
-                    <div style={{ display: 'flex', gap: '0.4rem' }}>
+                    <div style={{ display: 'flex', gap: '0.6rem', alignItems: 'center', flexWrap: 'wrap' }}>
+                      <label style={{ display: 'flex', alignItems: 'center', gap: '0.25rem', fontSize: '0.75rem', color: '#94a3b8', cursor: 'pointer' }}>
+                        <input
+                          type="checkbox"
+                          checked={settings.show_mini_on_close === 'true'}
+                          onChange={async (e) => {
+                            const val = e.target.checked ? 'true' : 'false';
+                            handleSaveSetting('show_mini_on_close', val);
+                            if (val === 'false' && window.require) {
+                              const { ipcRenderer } = window.require('electron');
+                              await ipcRenderer.invoke('mini-window:close');
+                            }
+                          }}
+                          style={{ width: '12px', height: '12px', accentColor: '#6366f1' }}
+                        />
+                        <span>メイン画面を閉じたら表示</span>
+                      </label>
                       <button
                         onClick={async () => {
                           if (window.require) {
@@ -704,14 +727,14 @@ function App() {
                         {fatigueData.statusName}
                       </span>
                       <span style={{ fontSize: '0.85rem', color: '#94a3b8' }}>
-                        (アイドル率 {fatigueData.idleRate}%)
+                        (稼働率 {fatigueData.statusName === 'Flesh' ? '集計中. . .' : `${100 - fatigueData.idleRate}%`})
                       </span>
                     </div>
 
                     <div style={{ height: '8px', background: 'rgba(255, 255, 255, 0.05)', borderRadius: '4px', overflow: 'hidden' }}>
                       <div style={{
                         height: '100%',
-                        width: `${100 - fatigueData.idleRate}%`,
+                        width: `${fatigueData.statusName === 'Flesh' ? 0 : 100 - fatigueData.idleRate}%`,
                         background: fatigueData.statusName === 'Danger' ? 'linear-gradient(90deg, #ef4444, #f87171)' : fatigueData.statusName === 'Busy' ? 'linear-gradient(90deg, #f97316, #fb923c)' : 'linear-gradient(90deg, #10b981, #34d399)',
                         borderRadius: '4px',
                         transition: 'width 0.5s ease'
@@ -757,7 +780,7 @@ function App() {
                           : fatigueData.statusName === 'Good'
                             ? "良いバランスです。\nこの調子で進めましょう！"
                             : fatigueData.statusName === 'Flesh'
-                              ? "まだ作業を始めたばかりです。\nこの調子で進めましょう！"
+                              ? "今日も一日頑張りましょう！！"
                               : "休憩を入れながら\nマイペースに進めましょう！"}
                     </div>
                   </div>
@@ -938,56 +961,6 @@ function App() {
                         onChange={(e) => handleSaveSetting('idle_threshold', e.target.value)}
                         style={{ width: '100%', accentColor: '#10b981' }}
                       />
-                    </div>
-                  </div>
-
-                  {/* ミニウィンドウの設定 */}
-                  <div style={{ marginBottom: '2rem', padding: '1.5rem', background: 'rgba(255,255,255,0.02)', borderRadius: '16px' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '1.5rem' }}>
-                      <Monitor size={20} color="#6366f1" />
-                      <div>
-                        <div style={{ fontWeight: '600' }}>ミニウィンドウ（ウィジェット）の設定</div>
-                        <div style={{ fontSize: '0.8rem', color: '#94a3b8' }}>親画面を非表示にした際のミニ画面の自動表示、および初期表示位置を設定します。</div>
-                      </div>
-                    </div>
-
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem', borderTop: '1px solid rgba(255,255,255,0.05)', paddingTop: '1.5rem' }}>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                        <div>
-                          <span style={{ fontSize: '0.9rem', color: 'var(--text)', fontWeight: '500' }}>メイン画面を閉じたときにミニ画面を自動表示</span>
-                          <div style={{ fontSize: '0.8rem', color: '#94a3b8' }}>親画面（PulseWork）を閉じたとき、邪魔にならないミニ画面を表示します。</div>
-                        </div>
-                        <input
-                          type="checkbox"
-                          checked={settings.show_mini_on_close === 'true'}
-                          onChange={(e) => handleSaveSetting('show_mini_on_close', e.target.checked ? 'true' : 'false')}
-                          style={{ width: '18px', height: '18px', accentColor: '#6366f1' }}
-                        />
-                      </div>
-
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem' }}>
-                        <div>
-                          <span style={{ fontSize: '0.9rem', color: 'var(--text)', fontWeight: '500' }}>ミニ画面の初期表示位置</span>
-                          <div style={{ fontSize: '0.8rem', color: '#94a3b8' }}>画面のどの位置に表示するかを決定します。</div>
-                        </div>
-                        <select
-                          value={settings.mini_window_position || '右上'}
-                          onChange={(e) => handleSaveSetting('mini_window_position', e.target.value)}
-                          style={{
-                            padding: '0.5rem',
-                            borderRadius: '6px',
-                            border: '1px solid rgba(255,255,255,0.1)',
-                            background: 'rgba(0,0,0,0.2)',
-                            color: 'var(--text)',
-                            minWidth: '100px'
-                          }}
-                        >
-                          <option value="左上">左上</option>
-                          <option value="右上">右上</option>
-                          <option value="左下">左下</option>
-                          <option value="右下">右下</option>
-                        </select>
-                      </div>
                     </div>
                   </div>
 
@@ -1306,7 +1279,7 @@ function App() {
                       ※フロントエンド側で動的に置換するため、過去の元データが上書きされることはありません。
                     </p>
 
-                    <h3>4. ミニ画面と疲労状態・アイドル率</h3>
+                    <h3>4. ミニ画面と疲労状態・稼働率</h3>
                     <p>
                       当日の稼働開始時刻とサンプリング数に基づき、リアルタイムに「疲労状態（Chill/Good/Busy/Danger）」を自動算出。
                       さらに設定画面の「ミニウィンドウの自動表示」をオンにすることで、親画面を閉じた際に、疲労状態を常時把握できるコンパクトなミニ画面（ウィジェット）をデスクトップ上に自動表示できます。
@@ -1348,7 +1321,7 @@ function App() {
                         </div>
                       </li>
                       <li><strong>スリープ時の記録:</strong> PCがスリープ状態、シャットダウンされている間は記録されません。</li>
-                      <li><strong>操作していない時間の判定:</strong> 一定時間（設定可能）操作がない場合、作業の記録を自動的に停止します。無操作状態が続くと、アイドル率が上がり、疲労状態が緩和されます。</li>
+                      <li><strong>操作していない時間の判定:</strong> 一定時間（設定可能）操作がない場合、作業の記録を自動的に停止します。無操作状態が続くと、稼働率が下がり、疲労状態が緩和されます。</li>
                     </ul>
                   </div>
                 </section>
@@ -1404,7 +1377,7 @@ function App() {
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
             <Activity size={15} color={fatigueData.statusName === 'Danger' ? '#ef4444' : fatigueData.statusName === 'Busy' ? '#f97316' : '#10b981'} />
-            <span style={{ fontSize: '0.75rem', fontWeight: '700', color: '#fff' }}>疲労状態</span>
+            <span style={{ fontSize: '0.75rem', fontWeight: '700', color: '#fff' }}>疲労ゲージ</span>
           </div>
           <div style={{ display: 'flex', gap: '0.3rem', WebkitAppRegion: 'no-drag' }}>
             <button
@@ -1436,13 +1409,13 @@ function App() {
               {fatigueData.statusName}
             </span>
             <span style={{ fontSize: '0.7rem', color: '#94a3b8' }}>
-              ({fatigueData.idleRate}%)
+              ({fatigueData.statusName === 'Flesh' ? '集計中. . .' : `${100 - fatigueData.idleRate}%`})
             </span>
           </div>
           <div style={{ height: '5px', background: 'rgba(255, 255, 255, 0.05)', borderRadius: '2.5px', overflow: 'hidden' }}>
             <div style={{
               height: '100%',
-              width: `${100 - fatigueData.idleRate}%`,
+              width: `${fatigueData.statusName === 'Flesh' ? 0 : 100 - fatigueData.idleRate}%`,
               background: fatigueData.statusName === 'Danger' ? 'linear-gradient(90deg, #ef4444, #f87171)' : fatigueData.statusName === 'Busy' ? 'linear-gradient(90deg, #f97316, #fb923c)' : 'linear-gradient(90deg, #10b981, #34d399)',
               borderRadius: '2.5px',
               transition: 'width 0.5s ease'
@@ -1468,7 +1441,7 @@ function App() {
               : fatigueData.statusName === 'Good'
                 ? "良いバランスです。\nこの調子で進めましょう！"
                 : fatigueData.statusName === 'Flesh'
-                  ? "まだ作業を始めたばかりです。\nこの調子で進めましょう！"
+                  ? "今日も一日頑張りましょう！！"
                   : "休憩を入れながら\nマイペースに進めましょう！"}
         </div>
 
