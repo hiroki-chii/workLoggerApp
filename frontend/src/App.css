@@ -17,6 +17,18 @@
   --gradient-1: rgba(92, 106, 196, 0.1);
   --gradient-2: rgba(156, 126, 222, 0.1);
   --sticky-bg: #1e293b;
+  /* ミニウィンドウ用 */
+  --mini-bg: rgba(30, 41, 59, 0.95);
+  --mini-border: rgba(255, 255, 255, 0.1);
+  --mini-text: #cbd5e1;
+  --mini-text-heading: #fff;
+  --mini-text-sub: #94a3b8;
+  --mini-text-dim: #64748b;
+  --mini-btn-bg: rgba(255, 255, 255, 0.05);
+  --mini-btn-border: rgba(255, 255, 255, 0.1);
+  --mini-btn-text: #94a3b8;
+  --mini-bar-bg: rgba(255, 255, 255, 0.05);
+  --mini-divider: rgba(255, 255, 255, 0.05);
 }
 
 .light {
@@ -29,6 +41,18 @@
   --gradient-1: rgba(92, 106, 196, 0.03);
   --gradient-2: rgba(156, 126, 222, 0.03);
   --sticky-bg: #e2e8f0;
+  /* ミニウィンドウ用 */
+  --mini-bg: rgba(255, 255, 255, 0.92);
+  --mini-border: rgba(0, 0, 0, 0.1);
+  --mini-text: #374151;
+  --mini-text-heading: #1f2937;
+  --mini-text-sub: #6b7280;
+  --mini-text-dim: #9ca3af;
+  --mini-btn-bg: rgba(0, 0, 0, 0.04);
+  --mini-btn-border: rgba(0, 0, 0, 0.1);
+  --mini-btn-text: #6b7280;
+  --mini-bar-bg: rgba(0, 0, 0, 0.06);
+  --mini-divider: rgba(0, 0, 0, 0.06);
 }
 
 * {

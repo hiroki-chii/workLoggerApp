@@ -174,17 +174,17 @@ app.get('/api/fatigue', (req, res) => {
     const nowMs = Date.now();
     const elapsedSeconds = Math.max(0, Math.floor((nowMs - startMs) / 1000));
 
-    // 2. 直近90分間のスライディングウィンドウ
-    const windowStartMs = nowMs - 90 * 60 * 1000;
+    // 2. 直近60分間のスライディングウィンドウ
+    const windowStartMs = nowMs - 60 * 60 * 1000;
     const startTimeInWindowMs = Math.max(startMs, windowStartMs);
     const elapsedInWindowSeconds = Math.max(0, Math.floor((nowMs - startTimeInWindowMs) / 1000));
 
-    // 直近90分間かつ本日分の有効ログ数を取得
+    // 直近60分間かつ本日分の有効ログ数を取得
     const windowActiveLogsObj = db.prepare(`
       SELECT COUNT(*) as activeLogsInWindow
       FROM logs
       WHERE date(timestamp, 'localtime') = date('now', 'localtime')
-        AND timestamp >= datetime('now', '-90 minutes')
+        AND timestamp >= datetime('now', '-60 minutes')
     `).get();
 
     const activeLogsInWindow = windowActiveLogsObj ? windowActiveLogsObj.activeLogsInWindow : 0;

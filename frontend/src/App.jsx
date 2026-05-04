@@ -278,16 +278,10 @@ function App() {
       if (fatigueRes && fatigueRes.ok) {
         const fData = await fatigueRes.json();
         setFatigueData(fData);
-        const now = Date.now();
+         const now = Date.now();
         if (!window.location.search.includes('mini=true') && fData.statusName === 'Critical') {
           if (prevStatusRef.current !== 'Critical') {
-            const requiredExpectedLogs = Math.ceil(fData.activeLogs / 0.855);
-            const diffLogs = Math.max(0, requiredExpectedLogs - fData.expectedLogs);
-            const requiredSeconds = diffLogs * 10;
-            const requiredMinutes = requiredSeconds / 60;
-            const restMinutes = Math.ceil(requiredMinutes / 10) * 10;
-            const finalMinutes = restMinutes > 0 ? restMinutes : 10;
-            const message = `長時間の作業お疲れ様です。${finalMinutes}分ほど休憩を取りませんか？`;
+            const message = `長時間の作業お疲れ様です。そろそろ休憩を取りませんか？`;
 
             if (window.require) {
               const { ipcRenderer } = window.require('electron');
@@ -1312,7 +1306,7 @@ function App() {
 
                     <h3>4. ミニ画面と疲労状態・稼働率</h3>
                     <p>
-                      <strong>90分スライディングウィンドウ方式</strong>に基づき、直近90分間の活動状況からリアルタイムに疲労状態（Restored / Calm / Focused / Strained / Critical）を自動算出します。過去の休息履歴に影響されず、直近の過集中を正確に検知可能です。最初の30分間は <strong>Calculating（集計中）</strong>と表示されます。
+                      <strong>60分スライディングウィンドウ方式</strong>に基づき、直近60分間の活動状況からリアルタイムに疲労状態（Restored / Calm / Focused / Strained / Critical）を自動算出します。過去の休息履歴に影響されず、直近の過集中を正確に検知可能です。最初の30分間は <strong>Calculating（集計中）</strong>と表示されます。
                     </p>
                     <p>
                       疲労状態が <strong>Critical（限界）</strong>に達したときは、休憩を促す警告アラートが画面上に通知されます（過度なアラートを防ぐため、切り替わった最初の一回のみ通知されます）。
@@ -1412,11 +1406,11 @@ function App() {
         display: 'flex',
         flexDirection: 'column',
         justifyContent: 'space-between',
-        background: 'rgba(30, 41, 59, 0.95)',
+        background: 'var(--mini-bg)',
         backdropFilter: 'blur(12px)',
-        border: '1px solid rgba(255, 255, 255, 0.1)',
+        border: '1px solid var(--mini-border)',
         borderRadius: '16px',
-        color: '#cbd5e1',
+        color: 'var(--mini-text)',
         boxSizing: 'border-box',
         overflow: 'hidden'
       }}>
@@ -1424,7 +1418,7 @@ function App() {
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
               <Activity size={15} color={fatigueData.statusName === 'Critical' ? '#ef4444' : fatigueData.statusName === 'Strained' ? '#f97316' : '#10b981'} />
-              <span style={{ fontSize: '0.75rem', fontWeight: '700', color: '#fff' }}>疲労ゲージ</span>
+              <span style={{ fontSize: '0.75rem', fontWeight: '700', color: 'var(--mini-text-heading)' }}>疲労ゲージ</span>
             </div>
           </div>
           <div style={{ display: 'flex', gap: '0.3rem', WebkitAppRegion: 'no-drag' }}>
@@ -1436,9 +1430,9 @@ function App() {
                 }
               }}
               style={{
-                background: 'rgba(255, 255, 255, 0.05)',
-                border: '1px solid rgba(255, 255, 255, 0.1)',
-                color: '#94a3b8',
+                background: 'var(--mini-btn-bg)',
+                border: '1px solid var(--mini-btn-border)',
+                color: 'var(--mini-btn-text)',
                 borderRadius: '6px',
                 padding: '0.15rem 0.4rem',
                 fontSize: '0.7rem',
@@ -1454,10 +1448,10 @@ function App() {
         <div style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem' }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.1rem', flex: 1, minWidth: 0 }}>
-              <span style={{ fontSize: '1.25rem', fontWeight: '800', color: fatigueData.statusName === 'Critical' ? '#ef4444' : fatigueData.statusName === 'Strained' ? '#f97316' : '#fff', lineHeight: 1.1 }}>
+              <span style={{ fontSize: '1.25rem', fontWeight: '800', color: fatigueData.statusName === 'Critical' ? '#ef4444' : fatigueData.statusName === 'Strained' ? '#f97316' : 'var(--mini-text-heading)', lineHeight: 1.1 }}>
                 {fatigueData.statusName}
               </span>
-              <span style={{ fontSize: '0.7rem', color: '#94a3b8' }}>
+              <span style={{ fontSize: '0.7rem', color: 'var(--mini-text-sub)' }}>
                 ({fatigueData.statusName === 'Calculating' ? '集計中. . .' : `${100 - fatigueData.idleRate}%`})
               </span>
             </div>
@@ -1475,7 +1469,7 @@ function App() {
             </div>
           </div>
 
-          <div style={{ height: '5px', background: 'rgba(255, 255, 255, 0.05)', borderRadius: '2.5px', overflow: 'hidden' }}>
+          <div style={{ height: '5px', background: 'var(--mini-bar-bg)', borderRadius: '2.5px', overflow: 'hidden' }}>
             <div style={{
               height: '100%',
               width: `${fatigueData.statusName === 'Calculating' ? 0 : 100 - fatigueData.idleRate}%`,
@@ -1500,9 +1494,9 @@ function App() {
           {getFatigueAdvice(fatigueData.statusName)}
         </div>
 
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem', borderTop: '1px solid rgba(255,255,255,0.05)', paddingTop: '0.35rem', WebkitAppRegion: 'no-drag' }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem', borderTop: '1px solid var(--mini-divider)', paddingTop: '0.35rem', WebkitAppRegion: 'no-drag' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <label style={{ display: 'flex', alignItems: 'center', gap: '0.25rem', fontSize: '0.65rem', color: '#94a3b8', cursor: 'pointer' }}>
+            <label style={{ display: 'flex', alignItems: 'center', gap: '0.25rem', fontSize: '0.65rem', color: 'var(--mini-text-sub)', cursor: 'pointer' }}>
               <input
                 type="checkbox"
                 checked={settings.show_mini_on_close === 'true'}
@@ -1518,7 +1512,7 @@ function App() {
               />
               <span>メイン画面を閉じたら表示</span>
             </label>
-            <label style={{ display: 'flex', alignItems: 'center', gap: '0.25rem', fontSize: '0.65rem', color: '#94a3b8', cursor: 'pointer' }}>
+            <label style={{ display: 'flex', alignItems: 'center', gap: '0.25rem', fontSize: '0.65rem', color: 'var(--mini-text-sub)', cursor: 'pointer' }}>
               <input
                 type="checkbox"
                 checked={settings.show_pet_in_mini === 'true'}
@@ -1532,7 +1526,7 @@ function App() {
             </label>
           </div>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <span style={{ fontSize: '0.65rem', color: '#64748b' }}>
+            <span style={{ fontSize: '0.65rem', color: 'var(--mini-text-dim)' }}>
               稼働: {Math.floor(fatigueData.activeLogs * 10 / 60)}分
             </span>
           </div>

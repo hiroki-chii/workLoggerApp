@@ -100,6 +100,7 @@ function startApp() {
       webPreferences: {
         nodeIntegration: true,
         contextIsolation: false,
+        backgroundThrottling: false,
       },
       icon: path.join(PROJECT_ROOT, 'assets', 'icon.png'),
       show: false,
@@ -292,12 +293,23 @@ function startApp() {
 
   ipcMain.handle('alert:danger', async (event, message) => {
     const parentWin = mainWindow && mainWindow.isVisible() ? mainWindow : (miniWindow && miniWindow.isVisible() ? miniWindow : null);
+    if (parentWin) {
+      if (parentWin.isMinimized()) parentWin.restore();
+      parentWin.show();
+      parentWin.focus();
+      if (parentWin === mainWindow) {
+        parentWin.setAlwaysOnTop(true, 'screen-saver');
+      }
+    }
     await dialog.showMessageBox(parentWin, {
       type: 'warning',
       title: 'WorkPulse からのお知らせ',
       message: message || '長時間の作業お疲れ様です。そろそろ休憩を取りませんか？☕',
       buttons: ['閉じる']
     });
+    if (parentWin === mainWindow && parentWin && !parentWin.isDestroyed()) {
+      parentWin.setAlwaysOnTop(false);
+    }
     return true;
   });
 
