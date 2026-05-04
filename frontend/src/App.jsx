@@ -272,7 +272,7 @@ function App() {
       if (fatigueRes && fatigueRes.ok) {
         const fData = await fatigueRes.json();
         setFatigueData(fData);
-         const now = Date.now();
+        const now = Date.now();
         if (!window.location.search.includes('mini=true') && fData.statusName === 'Critical') {
           if (prevStatusRef.current !== 'Critical') {
             const message = `長時間の作業お疲れ様です。そろそろ休憩を取りませんか？`;
@@ -706,7 +706,7 @@ function App() {
 
                 <div className="card">
                   <div className="card-title">
-                    <Clock size={20} /> 現在の状況
+                    <Clock size={20} /> 件数状況
                   </div>
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
                     <div style={{ padding: '1rem 1.5rem', background: 'rgba(99, 102, 241, 0.1)', borderRadius: '16px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -1561,20 +1561,20 @@ function App() {
                 <span>ダッシュボード</span>
               </div>
               <div
-                className={`nav-item ${activeTab === 'history' ? 'active' : ''}`}
-                onClick={() => setActiveTab('history')}
-                title="履歴"
-              >
-                <History size={20} />
-                <span>履歴</span>
-              </div>
-              <div
                 className={`nav-item ${activeTab === 'timetable' ? 'active' : ''}`}
                 onClick={() => setActiveTab('timetable')}
                 title="タイムテーブル"
               >
                 <LayoutGrid size={20} />
                 <span>タイムテーブル</span>
+              </div>
+              <div
+                className={`nav-item ${activeTab === 'history' ? 'active' : ''}`}
+                onClick={() => setActiveTab('history')}
+                title="履歴"
+              >
+                <History size={20} />
+                <span>履歴</span>
               </div>
               <div
                 className={`nav-item ${activeTab === 'settings' ? 'active' : ''}`}
