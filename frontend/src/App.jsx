@@ -9,7 +9,7 @@ import {
   Calendar,
   PieChart,
   List,
-  LayoutGrid,
+  Grid,
 
   RefreshCw,
   Play,
@@ -860,7 +860,7 @@ function App() {
             <section className="card fade-in" style={{ flex: 1, marginTop: '1rem', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
               <div className="card-title" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                  <LayoutGrid size={20} /> 24時間・週次アクティビティ
+                  <Grid size={20} /> 24時間・週次アクティビティ
                 </div>
                 <button
                   onClick={jumpToCurrentTime}
@@ -1565,7 +1565,7 @@ function App() {
                 onClick={() => setActiveTab('timetable')}
                 title="タイムテーブル"
               >
-                <LayoutGrid size={20} />
+                <Grid size={20} />
                 <span>タイムテーブル</span>
               </div>
               <div
