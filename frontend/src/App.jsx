@@ -158,12 +158,6 @@ const PetIcon = ({ status, size = 40 }) => {
     eyeLeft = <circle cx="14" cy="18" r="1.5" fill="#fff" />;
     eyeRight = <circle cx="26" cy="18" r="1.5" fill="#fff" />;
     mouth = <path d="M 17 25 Q 20 21 23 25" stroke="#fff" strokeWidth="2" fill="none" strokeLinecap="round" />;
-  } else if (status === 'Calculating') {
-    bodyColor = '#94a3b8';
-    className = 'pet-pulse';
-    eyeLeft = <path d="M 12 18 L 16 18" stroke="#fff" strokeWidth="2" strokeLinecap="round" />;
-    eyeRight = <path d="M 24 18 L 28 18" stroke="#fff" strokeWidth="2" strokeLinecap="round" />;
-    mouth = <circle cx="20" cy="24" r="1.5" fill="#fff" />;
   } else { // Critical
     bodyColor = '#f87171';
     className = 'pet-danger-shake';
@@ -211,7 +205,7 @@ function App() {
   const [fatigueData, setFatigueData] = useState({
     fatigueLevel: 0,
     idleRate: 100,
-    statusName: 'Chill',
+    statusName: 'Initializing',
     startTime: null,
     elapsedSeconds: 0,
     activeLogs: 0,
@@ -780,13 +774,13 @@ function App() {
                     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
                       <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
                         <span style={{ fontSize: '2rem', fontWeight: '800', color: fatigueData.statusName === 'Critical' ? '#ef4444' : fatigueData.statusName === 'Strained' ? '#f97316' : 'var(--text)', lineHeight: 1 }}>
-                          {fatigueData.statusName}
+                          {fatigueData.statusName === 'Initializing' ? 'Initializing . . .' : fatigueData.statusName}
                         </span>
                         <span style={{ fontSize: '0.85rem', color: '#94a3b8' }}>
-                          (稼働率 {fatigueData.statusName === 'Calculating' ? '集計中. . .' : `${100 - fatigueData.idleRate}%`})
+                          (稼働率 {fatigueData.statusName === 'Initializing' ? '集計中. . .' : `${100 - fatigueData.idleRate}%`})
                         </span>
                       </div>
-                      <div style={{ marginRight: '1.5rem', marginTop: '-0.25rem' }}>
+                      <div style={{ marginRight: '1.5rem', marginTop: '-0.25rem', visibility: fatigueData.statusName === 'Initializing' ? 'hidden' : 'visible' }}>
                         <PetIcon status={fatigueData.statusName} size={48} />
                       </div>
                     </div>
@@ -794,7 +788,7 @@ function App() {
                     <div style={{ height: '8px', background: 'rgba(255, 255, 255, 0.05)', borderRadius: '4px', overflow: 'hidden' }}>
                       <div style={{
                         height: '100%',
-                        width: `${fatigueData.statusName === 'Calculating' ? 0 : 100 - fatigueData.idleRate}%`,
+                        width: fatigueData.statusName === 'Initializing' ? 0 : `${100 - fatigueData.idleRate}%`,
                         background: fatigueData.statusName === 'Critical' ? 'linear-gradient(90deg, #ef4444, #f87171)' : fatigueData.statusName === 'Strained' ? 'linear-gradient(90deg, #f97316, #fb923c)' : 'linear-gradient(90deg, #10b981, #34d399)',
                         borderRadius: '4px',
                         transition: 'width 0.5s ease'
@@ -1306,7 +1300,7 @@ function App() {
 
                     <h3>4. ミニ画面と疲労状態・稼働率</h3>
                     <p>
-                      <strong>60分スライディングウィンドウ方式</strong>に基づき、直近60分間の活動状況からリアルタイムに疲労状態（Restored / Calm / Focused / Strained / Critical）を自動算出します。過去の休息履歴に影響されず、直近の過集中を正確に検知可能です。最初の30分間は <strong>Calculating（集計中）</strong>と表示されます。
+                      <strong>60分スライディングウィンドウ方式</strong>に基づき、直近60分間の活動状況からリアルタイムに疲労状態（Restored / Calm / Focused / Strained / Critical）を自動算出します。過去の休息履歴に影響されず、直近の過集中を正確に検知可能です。
                     </p>
                     <p>
                       疲労状態が <strong>Critical（限界）</strong>に達したときは、休憩を促す警告アラートが画面上に通知されます（過度なアラートを防ぐため、切り替わった最初の一回のみ通知されます）。
@@ -1449,10 +1443,10 @@ function App() {
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.1rem', flex: 1, minWidth: 0 }}>
               <span style={{ fontSize: '1.25rem', fontWeight: '800', color: fatigueData.statusName === 'Critical' ? '#ef4444' : fatigueData.statusName === 'Strained' ? '#f97316' : 'var(--mini-text-heading)', lineHeight: 1.1 }}>
-                {fatigueData.statusName}
+                {fatigueData.statusName === 'Initializing' ? 'Initializing . . .' : fatigueData.statusName}
               </span>
               <span style={{ fontSize: '0.7rem', color: 'var(--mini-text-sub)' }}>
-                ({fatigueData.statusName === 'Calculating' ? '集計中. . .' : `${100 - fatigueData.idleRate}%`})
+                ({fatigueData.statusName === 'Initializing' ? '集計中. . .' : `${100 - fatigueData.idleRate}%`})
               </span>
             </div>
             <div style={{
@@ -1462,7 +1456,7 @@ function App() {
               alignItems: 'center',
               justifyContent: 'center',
               flexShrink: 0,
-              visibility: settings.show_pet_in_mini === 'true' ? 'visible' : 'hidden',
+              visibility: settings.show_pet_in_mini === 'true' && fatigueData.statusName !== 'Initializing' ? 'visible' : 'hidden',
               marginRight: '25px'
             }}>
               <PetIcon status={fatigueData.statusName} />
@@ -1472,7 +1466,7 @@ function App() {
           <div style={{ height: '5px', background: 'var(--mini-bar-bg)', borderRadius: '2.5px', overflow: 'hidden' }}>
             <div style={{
               height: '100%',
-              width: `${fatigueData.statusName === 'Calculating' ? 0 : 100 - fatigueData.idleRate}%`,
+              width: fatigueData.statusName === 'Initializing' ? 0 : `${100 - fatigueData.idleRate}%`,
               background: fatigueData.statusName === 'Critical' ? 'linear-gradient(90deg, #ef4444, #f87171)' : fatigueData.statusName === 'Strained' ? 'linear-gradient(90deg, #f97316, #fb923c)' : 'linear-gradient(90deg, #10b981, #34d399)',
               borderRadius: '2.5px',
               transition: 'width 0.5s ease'

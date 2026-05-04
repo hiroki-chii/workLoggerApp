@@ -161,7 +161,7 @@ app.get('/api/fatigue', (req, res) => {
       return res.json({
         fatigueLevel: 0,
         idleRate: 0,
-        statusName: 'Flesh',
+        statusName: 'Initializing',
         startTime: null,
         elapsedSeconds: 0,
         activeLogs: 0,
@@ -189,15 +189,16 @@ app.get('/api/fatigue', (req, res) => {
 
     const activeLogsInWindow = windowActiveLogsObj ? windowActiveLogsObj.activeLogsInWindow : 0;
     const samplingInterval = 11;
-    const expectedLogsInWindow = Math.max(1, Math.floor(elapsedInWindowSeconds / samplingInterval));
+    // スライディングウィンドウを常に60分(3600秒)として計算する。
+    // これにより、起動直後や30分経過時点などでも、過去60分のうちアプリ未起動の時間は「アイドル(休憩)」として扱われます。
+    const expectedLogsInWindow = Math.max(1, Math.floor(3600 / samplingInterval));
+
 
     // ウィンドウ内アイドル率を計算
     const idleRatePercent = Math.max(0, Math.min(100, Math.round(((expectedLogsInWindow - activeLogsInWindow) / expectedLogsInWindow) * 100)));
 
     let statusName = 'Critical';
-    if (elapsedInWindowSeconds < 1800) {
-      statusName = 'Calculating'; // ウィンドウ内の経過時間が30分未満の場合
-    } else if (idleRatePercent >= 40) {
+    if (idleRatePercent >= 40) {
       statusName = 'Restored';
     } else if (idleRatePercent >= 25) {
       statusName = 'Calm';
@@ -216,7 +217,6 @@ app.get('/api/fatigue', (req, res) => {
       fatigueLevel,
       idleRate: idleRatePercent,
       statusName,
-      isInitialGracePeriod: elapsedInWindowSeconds < 1800,
       startTime: startTimeISO,
       elapsedSeconds,
       activeLogs: logInfo.activeLogs,
