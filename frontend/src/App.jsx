@@ -126,10 +126,79 @@ const formatNumberWithSuffix = (num) => {
 const getFatigueAdvice = (statusName) => {
   if (statusName === 'Critical') return "少し頑張りすぎていませんか？\nそろそろ小休憩を！";
   if (statusName === 'Strained') return "そろそろ疲れていませんか？\n深呼吸でリフレッシュを！";
-  if (statusName === 'Focused') return "良いバランスです。\nこの調子で進めましょう！";
-  if (statusName === 'Balanced') return "マイペースに進めましょう！";
-  if (statusName === 'Restored') return "新鮮な気持ちで進めていきましょう！！";
+  if (statusName === 'Focused') return "良いペースです。\nこの調子で進めましょう！";
+  if (statusName === 'Calm') return "リラックスして取り組みましょう！";
+  if (statusName === 'Restored') return "新鮮な気持ちで頑張りましょう！！";
   return "稼働データの集計を開始しました。\n今日も一日頑張りましょう！！";
+};
+
+const PetIcon = ({ status, size = 40 }) => {
+  let bodyColor = '#10b981';
+  let eyeLeft = <circle cx="14" cy="18" r="2" fill="#fff" />;
+  let eyeRight = <circle cx="26" cy="18" r="2" fill="#fff" />;
+  let mouth = <path d="M 18 24 Q 20 27 22 24" stroke="#fff" strokeWidth="2" fill="none" strokeLinecap="round" />;
+  let className = 'pet-bounce';
+
+  if (status === 'Restored') {
+    bodyColor = '#10b981';
+    className = 'pet-bounce';
+    mouth = <path d="M 18 23 Q 20 26 22 23" stroke="#fff" strokeWidth="2" fill="none" strokeLinecap="round" />;
+  } else if (status === 'Focused') {
+    bodyColor = '#34d399';
+    className = 'pet-pulse-subtle';
+    mouth = <path d="M 18 22 Q 20 25 22 22" stroke="#fff" strokeWidth="2" fill="none" strokeLinecap="round" />;
+  } else if (status === 'Calm') {
+    bodyColor = '#38bdf8';
+    className = 'pet-float';
+    eyeLeft = <path d="M 12 18.5 L 16 18" stroke="#fff" strokeWidth="2" strokeLinecap="round" />;
+    eyeRight = <path d="M 24 18 L 28 18.5" stroke="#fff" strokeWidth="2" strokeLinecap="round" />;
+    mouth = <path d="M 18 24 Q 20 27 22 24" stroke="#fff" strokeWidth="2" fill="none" strokeLinecap="round" />;
+  } else if (status === 'Strained') {
+    bodyColor = '#fb923c';
+    className = 'pet-shake';
+    eyeLeft = <circle cx="14" cy="18" r="1.5" fill="#fff" />;
+    eyeRight = <circle cx="26" cy="18" r="1.5" fill="#fff" />;
+    mouth = <path d="M 17 25 Q 20 21 23 25" stroke="#fff" strokeWidth="2" fill="none" strokeLinecap="round" />;
+  } else if (status === 'Calculating') {
+    bodyColor = '#94a3b8';
+    className = 'pet-pulse';
+    eyeLeft = <path d="M 12 18 L 16 18" stroke="#fff" strokeWidth="2" strokeLinecap="round" />;
+    eyeRight = <path d="M 24 18 L 28 18" stroke="#fff" strokeWidth="2" strokeLinecap="round" />;
+    mouth = <circle cx="20" cy="24" r="1.5" fill="#fff" />;
+  } else { // Critical
+    bodyColor = '#f87171';
+    className = 'pet-danger-shake';
+    eyeLeft = <path d="M 12 16 L 16 20 M 16 16 L 12 20" stroke="#fff" strokeWidth="2" strokeLinecap="round" />;
+    eyeRight = <path d="M 24 16 L 28 20 M 28 16 L 24 20" stroke="#fff" strokeWidth="2" fill="none" strokeLinecap="round" />;
+    mouth = <path d="M 17 25 Q 20 21 23 25" stroke="#fff" strokeWidth="2" fill="none" strokeLinecap="round" />;
+  }
+
+  return (
+    <svg className={className} width={size} height={size} viewBox="0 0 40 40" style={{ display: 'inline-block', verticalAlign: 'middle', WebkitAppRegion: 'no-drag' }}>
+      <path d="M 4 24 C 4 10, 36 10, 36 24 C 36 34, 28 36, 20 36 C 12 36, 4 34, 4 24 Z" fill={bodyColor} />
+      {(status === 'Restored' || status === 'Focused') && (
+        <>
+          <circle cx="9" cy="19" r="2.5" fill="#f472b6" opacity="0.6" />
+          <circle cx="31" cy="19" r="2.5" fill="#f472b6" opacity="0.6" />
+        </>
+      )}
+      {eyeLeft}
+      {eyeRight}
+      {mouth}
+      {status === 'Focused' && (
+        <>
+          <path d="M 5 9 L 7 11 L 5 13 L 3 11 Z" fill="#fef08a" opacity="0.9" className="pet-sparkle" style={{ animationDelay: '0s' }} />
+          <path d="M 34 10 L 35.5 11.5 L 34 13 L 32.5 11.5 Z" fill="#fef08a" opacity="0.9" className="pet-sparkle" style={{ animationDelay: '0.4s' }} />
+        </>
+      )}
+      {(status === 'Critical' || status === 'Strained') && (
+        <>
+          <path d="M 31 11 Q 33 13 32 15 Q 31 16 30 14 Q 29 13 31 11 Z" fill="#38bdf8" />
+          <path d="M 34 14 Q 36 16 35 18 Q 34 19 33 17 Q 32 16 34 14 Z" fill="#38bdf8" />
+        </>
+      )}
+    </svg>
+  );
 };
 
 function App() {
@@ -735,13 +804,18 @@ function App() {
                   </div>
 
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem', flex: 1, justifyContent: 'center' }}>
-                    <div style={{ display: 'flex', alignItems: 'baseline', gap: '0.5rem' }}>
-                      <span style={{ fontSize: '2rem', fontWeight: '800', color: fatigueData.statusName === 'Critical' ? '#ef4444' : fatigueData.statusName === 'Strained' ? '#f97316' : 'var(--text)' }}>
-                        {fatigueData.statusName}
-                      </span>
-                      <span style={{ fontSize: '0.85rem', color: '#94a3b8' }}>
-                        (稼働率 {fatigueData.statusName === 'Calculating' ? '集計中. . .' : `${100 - fatigueData.idleRate}%`})
-                      </span>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
+                      <div style={{ display: 'flex', alignItems: 'baseline', gap: '0.5rem' }}>
+                        <span style={{ fontSize: '2rem', fontWeight: '800', color: fatigueData.statusName === 'Critical' ? '#ef4444' : fatigueData.statusName === 'Strained' ? '#f97316' : 'var(--text)' }}>
+                          {fatigueData.statusName}
+                        </span>
+                        <span style={{ fontSize: '0.85rem', color: '#94a3b8' }}>
+                          (稼働率 {fatigueData.statusName === 'Calculating' ? '集計中. . .' : `${100 - fatigueData.idleRate}%`})
+                        </span>
+                      </div>
+                      <div style={{ marginRight: '1.5rem', marginTop: '-0.25rem' }}>
+                        <PetIcon status={fatigueData.statusName} size={48} />
+                      </div>
                     </div>
 
                     <div style={{ height: '8px', background: 'rgba(255, 255, 255, 0.05)', borderRadius: '4px', overflow: 'hidden' }}>
@@ -1290,7 +1364,7 @@ function App() {
 
                     <h3>4. ミニ画面と疲労状態・稼働率</h3>
                     <p>
-                      <strong>90分スライディングウィンドウ方式</strong>に基づき、直近90分間の活動状況からリアルタイムに疲労状態（Restored / Balanced / Focused / Strained / Critical）を自動算出します。過去の休息履歴に影響されず、直近の過集中を正確に検知可能です。最初の30分間は <strong>Calculating（集計中）</strong>と表示されます。
+                      <strong>90分スライディングウィンドウ方式</strong>に基づき、直近90分間の活動状況からリアルタイムに疲労状態（Restored / Calm / Focused / Strained / Critical）を自動算出します。過去の休息履歴に影響されず、直近の過集中を正確に検知可能です。最初の30分間は <strong>Calculating（集計中）</strong>と表示されます。
                     </p>
                     <p>
                       疲労状態が <strong>Critical（限界）</strong>のときは、{FATIGUE_ALERT_INTERVAL_MINUTES}分おきに休憩を促す警告アラートを画面上に通知します。
@@ -1404,81 +1478,6 @@ function App() {
               <Activity size={15} color={fatigueData.statusName === 'Critical' ? '#ef4444' : fatigueData.statusName === 'Strained' ? '#f97316' : '#10b981'} />
               <span style={{ fontSize: '0.75rem', fontWeight: '700', color: '#fff' }}>疲労ゲージ</span>
             </div>
-            {false && (() => {
-              const status = fatigueData.statusName;
-              let bodyColor = '#10b981';
-              let eyeLeft = <circle cx="14" cy="18" r="2" fill="#fff" />;
-              let eyeRight = <circle cx="26" cy="18" r="2" fill="#fff" />;
-              let mouth = <path d="M 18 24 Q 20 27 22 24" stroke="#fff" strokeWidth="2" fill="none" strokeLinecap="round" />;
-              let className = 'pet-bounce';
-
-              if (status === 'Restored') {
-                bodyColor = '#10b981';
-                className = 'pet-bounce';
-                mouth = <path d="M 18 23 Q 20 26 22 23" stroke="#fff" strokeWidth="2" fill="none" strokeLinecap="round" />;
-              } else if (status === 'Focused') {
-                bodyColor = '#34d399';
-                className = 'pet-pulse-subtle';
-                mouth = <path d="M 18 22 Q 20 25 22 22" stroke="#fff" strokeWidth="2" fill="none" strokeLinecap="round" />;
-              } else if (status === 'Balanced') {
-                bodyColor = '#38bdf8';
-                className = 'pet-float';
-                eyeLeft = <path d="M 12 18 L 16 18" stroke="#fff" strokeWidth="2" strokeLinecap="round" />;
-                eyeRight = <path d="M 24 18 L 28 18" stroke="#fff" strokeWidth="2" strokeLinecap="round" />;
-                mouth = <path d="M 18 22 Q 20 25 22 22" stroke="#fff" strokeWidth="2" fill="none" strokeLinecap="round" />;
-              } else if (status === 'Strained') {
-                bodyColor = '#fb923c';
-                className = 'pet-shake';
-                eyeLeft = <circle cx="14" cy="18" r="1.5" fill="#fff" />;
-                eyeRight = <circle cx="26" cy="18" r="1.5" fill="#fff" />;
-                mouth = <path d="M 17 25 Q 20 21 23 25" stroke="#fff" strokeWidth="2" fill="none" strokeLinecap="round" />;
-              } else if (status === 'Calculating') {
-                bodyColor = '#94a3b8';
-                className = 'pet-pulse';
-                eyeLeft = <path d="M 12 18 L 16 18" stroke="#fff" strokeWidth="2" strokeLinecap="round" />;
-                eyeRight = <path d="M 24 18 L 28 18" stroke="#fff" strokeWidth="2" strokeLinecap="round" />;
-                mouth = <circle cx="20" cy="24" r="1.5" fill="#fff" />;
-              } else { // Critical
-                bodyColor = '#f87171';
-                className = 'pet-danger-shake';
-                eyeLeft = <path d="M 12 16 L 16 20 M 16 16 L 12 20" stroke="#fff" strokeWidth="2" strokeLinecap="round" />;
-                eyeRight = <path d="M 24 16 L 28 20 M 28 16 L 24 20" stroke="#fff" strokeWidth="2" fill="none" strokeLinecap="round" />;
-                mouth = <path d="M 17 25 Q 20 21 23 25" stroke="#fff" strokeWidth="2" fill="none" strokeLinecap="round" />;
-              }
-
-              return (
-                <svg className={className} width="40" height="40" viewBox="0 0 40 40" style={{
-                  display: 'inline-block',
-                  verticalAlign: 'middle',
-                  WebkitAppRegion: 'no-drag',
-                  marginTop: '-8px',
-                  marginLeft: '20px'
-                }}>
-                  <path d="M 4 24 C 4 10, 36 10, 36 24 C 36 34, 28 36, 20 36 C 12 36, 4 34, 4 24 Z" fill={bodyColor} />
-                  {(status === 'Restored' || status === 'Focused') && (
-                    <>
-                      <circle cx="9" cy="19" r="2.5" fill="#f472b6" opacity="0.6" />
-                      <circle cx="31" cy="19" r="2.5" fill="#f472b6" opacity="0.6" />
-                    </>
-                  )}
-                  {eyeLeft}
-                  {eyeRight}
-                  {mouth}
-                  {status === 'Focused' && (
-                    <>
-                      <path d="M 5 9 L 7 11 L 5 13 L 3 11 Z" fill="#fef08a" opacity="0.9" className="pet-sparkle" style={{ animationDelay: '0s' }} />
-                      <path d="M 34 10 L 35.5 11.5 L 34 13 L 32.5 11.5 Z" fill="#fef08a" opacity="0.9" className="pet-sparkle" style={{ animationDelay: '0.4s' }} />
-                    </>
-                  )}
-                  {(status === 'Critical' || status === 'Strained') && (
-                    <>
-                      <path d="M 31 11 Q 33 13 32 15 Q 31 16 30 14 Q 29 13 31 11 Z" fill="#38bdf8" />
-                      <path d="M 34 14 Q 36 16 35 18 Q 34 19 33 17 Q 32 16 34 14 Z" fill="#38bdf8" />
-                    </>
-                  )}
-                </svg>
-              );
-            })()}
           </div>
           <div style={{ display: 'flex', gap: '0.3rem', WebkitAppRegion: 'no-drag' }}>
             <button
@@ -1505,85 +1504,26 @@ function App() {
         </div>
 
         <div style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '2rem' }}>
-            <div style={{ display: 'flex', alignItems: 'baseline', gap: '0.5rem' }}>
-              <span style={{ fontSize: '1.25rem', fontWeight: '800', color: fatigueData.statusName === 'Critical' ? '#ef4444' : fatigueData.statusName === 'Strained' ? '#f97316' : '#fff' }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.1rem', flex: 1, minWidth: 0 }}>
+              <span style={{ fontSize: '1.25rem', fontWeight: '800', color: fatigueData.statusName === 'Critical' ? '#ef4444' : fatigueData.statusName === 'Strained' ? '#f97316' : '#fff', lineHeight: 1.1 }}>
                 {fatigueData.statusName}
               </span>
               <span style={{ fontSize: '0.7rem', color: '#94a3b8' }}>
                 ({fatigueData.statusName === 'Calculating' ? '集計中. . .' : `${100 - fatigueData.idleRate}%`})
               </span>
             </div>
-            <div style={{ width: '40px', height: '40px', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, visibility: settings.show_pet_in_mini === 'true' ? 'visible' : 'hidden' }}>
-              {(() => {
-                const status = fatigueData.statusName;
-                let bodyColor = '#10b981';
-                let eyeLeft = <circle cx="14" cy="18" r="2" fill="#fff" />;
-                let eyeRight = <circle cx="26" cy="18" r="2" fill="#fff" />;
-                let mouth = <path d="M 18 24 Q 20 27 22 24" stroke="#fff" strokeWidth="2" fill="none" strokeLinecap="round" />;
-                let className = 'pet-bounce';
-
-                if (status === 'Restored') {
-                  bodyColor = '#10b981';
-                  className = 'pet-bounce';
-                  mouth = <path d="M 18 23 Q 20 26 22 23" stroke="#fff" strokeWidth="2" fill="none" strokeLinecap="round" />;
-                } else if (status === 'Focused') {
-                  bodyColor = '#34d399';
-                  className = 'pet-pulse-subtle';
-                  mouth = <path d="M 18 22 Q 20 25 22 22" stroke="#fff" strokeWidth="2" fill="none" strokeLinecap="round" />;
-                } else if (status === 'Balanced') {
-                  bodyColor = '#38bdf8';
-                  className = 'pet-float';
-                  eyeLeft = <path d="M 12 18 L 16 18" stroke="#fff" strokeWidth="2" strokeLinecap="round" />;
-                  eyeRight = <path d="M 24 18 L 28 18" stroke="#fff" strokeWidth="2" strokeLinecap="round" />;
-                  mouth = <path d="M 18 22 Q 20 25 22 22" stroke="#fff" strokeWidth="2" fill="none" strokeLinecap="round" />;
-                } else if (status === 'Strained') {
-                  bodyColor = '#fb923c';
-                  className = 'pet-shake';
-                  eyeLeft = <circle cx="14" cy="18" r="1.5" fill="#fff" />;
-                  eyeRight = <circle cx="26" cy="18" r="1.5" fill="#fff" />;
-                  mouth = <path d="M 17 25 Q 20 21 23 25" stroke="#fff" strokeWidth="2" fill="none" strokeLinecap="round" />;
-                } else if (status === 'Calculating') {
-                  bodyColor = '#94a3b8';
-                  className = 'pet-pulse';
-                  eyeLeft = <path d="M 12 18 L 16 18" stroke="#fff" strokeWidth="2" strokeLinecap="round" />;
-                  eyeRight = <path d="M 24 18 L 28 18" stroke="#fff" strokeWidth="2" strokeLinecap="round" />;
-                  mouth = <circle cx="20" cy="24" r="1.5" fill="#fff" />;
-                } else { // Critical
-                  bodyColor = '#f87171';
-                  className = 'pet-danger-shake';
-                  eyeLeft = <path d="M 12 16 L 16 20 M 16 16 L 12 20" stroke="#fff" strokeWidth="2" strokeLinecap="round" />;
-                  eyeRight = <path d="M 24 16 L 28 20 M 28 16 L 24 20" stroke="#fff" strokeWidth="2" fill="none" strokeLinecap="round" />;
-                  mouth = <path d="M 17 25 Q 20 21 23 25" stroke="#fff" strokeWidth="2" fill="none" strokeLinecap="round" />;
-                }
-
-                return (
-                  <svg className={className} width="40" height="40" viewBox="0 0 40 40" style={{ display: 'inline-block', verticalAlign: 'middle', WebkitAppRegion: 'no-drag' }}>
-                    <path d="M 4 24 C 4 10, 36 10, 36 24 C 36 34, 28 36, 20 36 C 12 36, 4 34, 4 24 Z" fill={bodyColor} />
-                    {(status === 'Restored' || status === 'Focused') && (
-                      <>
-                        <circle cx="9" cy="19" r="2.5" fill="#f472b6" opacity="0.6" />
-                        <circle cx="31" cy="19" r="2.5" fill="#f472b6" opacity="0.6" />
-                      </>
-                    )}
-                    {eyeLeft}
-                    {eyeRight}
-                    {mouth}
-                    {status === 'Focused' && (
-                      <>
-                        <path d="M 5 9 L 7 11 L 5 13 L 3 11 Z" fill="#fef08a" opacity="0.9" className="pet-sparkle" style={{ animationDelay: '0s' }} />
-                        <path d="M 34 10 L 35.5 11.5 L 34 13 L 32.5 11.5 Z" fill="#fef08a" opacity="0.9" className="pet-sparkle" style={{ animationDelay: '0.4s' }} />
-                      </>
-                    )}
-                    {(status === 'Critical' || status === 'Strained') && (
-                      <>
-                        <path d="M 31 11 Q 33 13 32 15 Q 31 16 30 14 Q 29 13 31 11 Z" fill="#38bdf8" />
-                        <path d="M 34 14 Q 36 16 35 18 Q 34 19 33 17 Q 32 16 34 14 Z" fill="#38bdf8" />
-                      </>
-                    )}
-                  </svg>
-                );
-              })()}
+            <div style={{
+              width: '40px',
+              height: '40px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              flexShrink: 0,
+              visibility: settings.show_pet_in_mini === 'true' ? 'visible' : 'hidden',
+              marginRight: '25px'
+            }}>
+              <PetIcon status={fatigueData.statusName} />
             </div>
           </div>
 
