@@ -24,14 +24,15 @@ function getSettings() {
     rows.forEach(r => { settings[r.key] = r.value; });
     return {
       interval: parseInt(settings.sampling_interval || 10) * 1000,
-      idleThreshold: parseInt(settings.idle_threshold || 300)
+      idleThreshold: 120 // 2分（120秒）に固定
     };
   } catch (err) {
-    return { interval: 10000, idleThreshold: 300 };
+    return { interval: 10000, idleThreshold: 120 };
   }
 }
 
 async function collect() {
+  const startTime = Date.now();
   if (!fs.existsSync(MONITOR_SCRIPT)) {
     console.error('[Collector] Monitor script not found:', MONITOR_SCRIPT);
     return;
@@ -88,8 +89,10 @@ async function collect() {
 
     // Schedule next run
     const settings = getSettings();
-    console.log('[Collector] Next sample in %ds', settings.interval / 1000);
-    setTimeout(collect, settings.interval);
+    const elapsed = Date.now() - startTime;
+    const waitTime = Math.max(0, settings.interval - elapsed);
+    console.log('[Collector] Next sample in %ds', (waitTime / 1000).toFixed(1));
+    setTimeout(collect, waitTime);
   });
 }
 

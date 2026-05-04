@@ -38,7 +38,6 @@ import { useTheme } from './ThemeProvider';
 ChartJS.register(ArcElement, Tooltip, Legend);
 
 const API_BASE = 'http://127.0.0.1:3001/api';
-const FATIGUE_ALERT_INTERVAL_MINUTES = 10;
 const DB_NAME = 'logs.db';
 const APP_DIR_NAME = 'workloggerapp';
 
@@ -224,7 +223,6 @@ function App() {
   const [activeTab, setActiveTab] = useState('dashboard');
   const timetableContainerRef = useRef(null);
   const prevStatusRef = useRef(null);
-  const lastAlertTimeRef = useRef(0);
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const [isRecording, setIsRecording] = useState(false);
   const { theme, setTheme, resolvedTheme } = useTheme();
@@ -281,9 +279,8 @@ function App() {
         const fData = await fatigueRes.json();
         setFatigueData(fData);
         const now = Date.now();
-        if (fData.statusName === 'Critical') {
-          if (prevStatusRef.current !== 'Critical' || now - lastAlertTimeRef.current >= FATIGUE_ALERT_INTERVAL_MINUTES * 60 * 1000) {
-            lastAlertTimeRef.current = now;
+        if (!window.location.search.includes('mini=true') && fData.statusName === 'Critical') {
+          if (prevStatusRef.current !== 'Critical') {
             const requiredExpectedLogs = Math.ceil(fData.activeLogs / 0.855);
             const diffLogs = Math.max(0, requiredExpectedLogs - fData.expectedLogs);
             const requiredSeconds = diffLogs * 10;
@@ -301,8 +298,6 @@ function App() {
               });
             }
           }
-        } else {
-          lastAlertTimeRef.current = 0;
         }
         prevStatusRef.current = fData.statusName;
       }
@@ -459,22 +454,6 @@ function App() {
 
   const handleSaveSetting = async (key, value) => {
     let finalValue = value.toString();
-    const samplingInterval = parseInt(settings.sampling_interval || 10);
-    const idleThreshold = parseInt(settings.idle_threshold || 300);
-
-    // バリデーション: アイドリング判定しきい値はサンプリング間隔以上である必要がある。また、上限を600秒に制限。
-    if (key === 'idle_threshold') {
-      const val = parseInt(value);
-      if (val < samplingInterval) {
-        finalValue = samplingInterval.toString();
-      } else if (val > 600) {
-        finalValue = '600';
-      }
-    }
-    if (key === 'sampling_interval' && parseInt(value) > idleThreshold) {
-      // サンプリング間隔を上げた場合、しきい値も連動して上げる
-      await handleSaveSetting('idle_threshold', value);
-    }
 
     try {
       await fetch(`${API_BASE}/settings`, {
@@ -1020,38 +999,7 @@ function App() {
                   <Settings size={20} /> アプリケーション設定
                 </div>
                 <div style={{ padding: '1.5rem' }}>
-                  <div style={{ marginBottom: '2rem', padding: '1.5rem', background: 'rgba(255,255,255,0.02)', borderRadius: '16px' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '1.5rem' }}>
-                      <Activity size={20} color="#10b981" />
-                      <div>
-                        <div style={{ fontWeight: '600' }}>無操作の判定設定</div>
-                        <div style={{ fontSize: '0.8rem', color: '#94a3b8' }}>
-                          操作がないとみなす時間（アイドル判定しきい値）を設定します。この時間以上操作がない場合、記録は行われません。
-                          <div style={{ marginTop: '0.5rem', display: 'flex', flexDirection: 'column', gap: '0.25rem', padding: '0.5rem 0.75rem', background: 'rgba(255,255,255,0.03)', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.05)' }}>
-                            <div style={{ fontSize: '0.75rem', fontWeight: '600', color: 'var(--text)' }}>■ ワークスタイルによる設定の目安</div>
-                            <div style={{ fontSize: '0.75rem' }}>・<strong style={{ color: 'var(--text)' }}>180秒以内</strong>：細かく離席を検知したい方向け（短期離席の自動除外）</div>
-                            <div style={{ fontSize: '0.75rem' }}>・<strong style={{ color: 'var(--text)' }}>300秒目安</strong>：通常のオフィスワーク（一般的な推奨値・初期値）</div>
-                            <div style={{ fontSize: '0.75rem' }}>・<strong style={{ color: 'var(--text)' }}>600秒目安</strong>：資料の精読、思考時間の長いクリエイティブ作業向け</div>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                    <div style={{ borderTop: '1px solid rgba(255,255,255,0.05)', paddingTop: '1.5rem' }}>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
-                        <span style={{ fontSize: '0.9rem', color: '#94a3b8' }}>操作していないとみなす時間</span>
-                        <span style={{ fontWeight: '600' }}>{settings.idle_threshold || 300}秒</span>
-                      </div>
-                      <input
-                        type="range"
-                        min="10"
-                        max="600"
-                        step="10"
-                        value={settings.idle_threshold || 300}
-                        onChange={(e) => handleSaveSetting('idle_threshold', e.target.value)}
-                        style={{ width: '100%', accentColor: '#10b981' }}
-                      />
-                    </div>
-                  </div>
+
 
 
                   {/* 表示名置換ルール設定セクション */}
@@ -1367,7 +1315,7 @@ function App() {
                       <strong>90分スライディングウィンドウ方式</strong>に基づき、直近90分間の活動状況からリアルタイムに疲労状態（Restored / Calm / Focused / Strained / Critical）を自動算出します。過去の休息履歴に影響されず、直近の過集中を正確に検知可能です。最初の30分間は <strong>Calculating（集計中）</strong>と表示されます。
                     </p>
                     <p>
-                      疲労状態が <strong>Critical（限界）</strong>のときは、{FATIGUE_ALERT_INTERVAL_MINUTES}分おきに休憩を促す警告アラートを画面上に通知します。
+                      疲労状態が <strong>Critical（限界）</strong>に達したときは、休憩を促す警告アラートが画面上に通知されます（過度なアラートを防ぐため、切り替わった最初の一回のみ通知されます）。
                       さらにメイン画面にある「メイン画面を閉じたら表示」をオンにすることで、親画面を閉じた際に、疲労状態や稼働率を常時把握できるコンパクトなミニ画面（ウィジェット）をデスクトップ上に自動表示できます。
                     </p>
                   </div>
@@ -1407,7 +1355,7 @@ function App() {
                         </div>
                       </li>
                       <li><strong>スリープ時の記録:</strong> PCがスリープ状態、シャットダウンされている間は記録されません。</li>
-                      <li><strong>操作していない時間の判定:</strong> 一定時間（設定可能）操作がない場合、作業の記録を自動的に停止します。無操作状態が続くと、稼働率が下がり、疲労状態が緩和されます。</li>
+                      <li><strong>操作していない時間の判定:</strong> 120秒間（2分）操作がない場合、作業の記録を自動的に停止します。無操作状態が続くと、稼働率が下がり、疲労状態が緩和されます。</li>
                     </ul>
                   </div>
                 </section>

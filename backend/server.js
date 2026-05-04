@@ -45,7 +45,7 @@ try {
 
   // デフォルト設定（初回のみ挿入、既存値は上書きしない）
   db.prepare('INSERT OR IGNORE INTO settings (key, value) VALUES (?, ?)').run('sampling_interval', '10');
-  db.prepare('INSERT OR IGNORE INTO settings (key, value) VALUES (?, ?)').run('idle_threshold', '300');
+  db.prepare('INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)').run('idle_threshold', '120');
   db.prepare('INSERT OR IGNORE INTO settings (key, value) VALUES (?, ?)').run('default_activity_color', '#6366f1');
   db.prepare('INSERT OR IGNORE INTO settings (key, value) VALUES (?, ?)').run('show_mini_on_close', 'true');
   db.prepare('INSERT OR IGNORE INTO settings (key, value) VALUES (?, ?)').run('mini_window_position', '右下');
@@ -188,7 +188,7 @@ app.get('/api/fatigue', (req, res) => {
     `).get();
 
     const activeLogsInWindow = windowActiveLogsObj ? windowActiveLogsObj.activeLogsInWindow : 0;
-    const samplingInterval = 10;
+    const samplingInterval = 11;
     const expectedLogsInWindow = Math.max(1, Math.floor(elapsedInWindowSeconds / samplingInterval));
 
     // ウィンドウ内アイドル率を計算
