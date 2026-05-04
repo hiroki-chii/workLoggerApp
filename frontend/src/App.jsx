@@ -620,38 +620,40 @@ function App() {
     }
   };
 
-  const renderDateHeader = (title) => (
+  const renderDateHeader = (title, showRange = true) => (
     <header className="header fade-in">
       <div>
         <h1>{title}</h1>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', marginTop: '0.5rem' }}>
-          <div className="date-picker-group">
-            <Calendar size={14} />
-            <input
-              type="date"
-              value={dateRange.start}
-              max={dateRange.end}
-              onChange={(e) => {
-                const newStart = e.target.value;
-                if (newStart <= dateRange.end) {
-                  setDateRange(prev => ({ ...prev, start: newStart }));
-                }
-              }}
-            />
-            <span>～</span>
-            <input
-              type="date"
-              value={dateRange.end}
-              min={dateRange.start}
-              onChange={(e) => {
-                const newEnd = e.target.value;
-                if (newEnd >= dateRange.start) {
-                  setDateRange(prev => ({ ...prev, end: newEnd }));
-                }
-              }}
-            />
+        {showRange && (
+          <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', marginTop: '0.5rem' }}>
+            <div className="date-picker-group">
+              <Calendar size={14} />
+              <input
+                type="date"
+                value={dateRange.start}
+                max={dateRange.end}
+                onChange={(e) => {
+                  const newStart = e.target.value;
+                  if (newStart <= dateRange.end) {
+                    setDateRange(prev => ({ ...prev, start: newStart }));
+                  }
+                }}
+              />
+              <span>～</span>
+              <input
+                type="date"
+                value={dateRange.end}
+                min={dateRange.start}
+                onChange={(e) => {
+                  const newEnd = e.target.value;
+                  if (newEnd >= dateRange.start) {
+                    setDateRange(prev => ({ ...prev, end: newEnd }));
+                  }
+                }}
+              />
+            </div>
           </div>
-        </div>
+        )}
       </div>
     </header>
   );
@@ -980,7 +982,7 @@ function App() {
       case 'settings':
         return (
           <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
-            {renderDateHeader('環境設定')}
+            {renderDateHeader('環境設定', false)}
             <div style={{ flex: 1, overflowY: 'auto', marginTop: '1rem', paddingRight: '0.5rem' }}>
               <section className="card fade-in">
                 <div className="card-title">
@@ -1262,7 +1264,7 @@ function App() {
       case 'help':
         return (
           <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
-            {renderDateHeader('ヘルプ・ガイド')}
+            {renderDateHeader('ヘルプ・ガイド', false)}
             <div style={{ flex: 1, overflowY: 'auto', marginTop: '1rem', paddingRight: '0.5rem' }}>
               <div className="help-grid">
                 <section className="card fade-in" style={{ animationDelay: '0.1s' }}>
