@@ -778,8 +778,8 @@ function App() {
 
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem', flex: 1, justifyContent: 'center' }}>
                     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
-                      <div style={{ display: 'flex', alignItems: 'baseline', gap: '0.5rem' }}>
-                        <span style={{ fontSize: '2rem', fontWeight: '800', color: fatigueData.statusName === 'Critical' ? '#ef4444' : fatigueData.statusName === 'Strained' ? '#f97316' : 'var(--text)' }}>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
+                        <span style={{ fontSize: '2rem', fontWeight: '800', color: fatigueData.statusName === 'Critical' ? '#ef4444' : fatigueData.statusName === 'Strained' ? '#f97316' : 'var(--text)', lineHeight: 1 }}>
                           {fatigueData.statusName}
                         </span>
                         <span style={{ fontSize: '0.85rem', color: '#94a3b8' }}>
