@@ -18,6 +18,25 @@ if (!fs.existsSync(dbDir)) {
 app.use(cors({ origin: '*' }));
 app.use(express.json());
 
+// リアルタイムステータス管理
+let currentStatus = {
+  idleSeconds: 0,
+  lastUpdate: Date.now()
+};
+
+app.get('/api/status', (req, res) => {
+  res.json(currentStatus);
+});
+
+app.post('/api/status', (req, res) => {
+  const { idleSeconds } = req.body;
+  currentStatus = {
+    idleSeconds: parseInt(idleSeconds || 0),
+    lastUpdate: Date.now()
+  };
+  res.json({ success: true });
+});
+
 let db;
 try {
   db = new Database(DB_PATH);

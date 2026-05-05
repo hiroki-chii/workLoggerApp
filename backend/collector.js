@@ -2,6 +2,28 @@ const { spawn } = require('child_process');
 const Database = require('better-sqlite3');
 const path = require('path');
 const fs = require('fs');
+const http = require('http');
+
+function updateStatus(idleSeconds) {
+  const data = JSON.stringify({ idleSeconds });
+  const options = {
+    hostname: '127.0.0.1',
+    port: 3001,
+    path: '/api/status',
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Content-Length': data.length
+    }
+  };
+
+  const req = http.request(options);
+  req.on('error', (e) => {
+    // console.error(`[Collector] Status update failed: ${e.message}`);
+  });
+  req.write(data);
+  req.end();
+}
 
 const DB_PATH = process.env.DB_PATH || path.join(process.env.APPDATA, 'workloggerapp', 'logs.db');
 const MONITOR_SCRIPT = process.env.MONITOR_SCRIPT_PATH || path.join(__dirname, 'monitor.ps1');
@@ -57,11 +79,16 @@ async function collect() {
         let logApp = result.appName || '不明なアプリ';
         let logWindow = result.windowTitle || '';
 
+        // サーバーへ無操作秒数を通知
+        updateStatus(result.idleSeconds || 0);
+
         if (result.idleSeconds >= settings.idleThreshold) {
           // 無操作の時は記録をスキップ
           shouldLog = false;
         } else if (result.appName && result.appName !== 'None') {
           shouldLog = true;
+        } else {
+          // アプリ名が取得できない場合なども、とりあえず操作中とは判定しない（または現状維持）
         }
 
         if (shouldLog) {

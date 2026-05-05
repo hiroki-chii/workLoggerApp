@@ -221,6 +221,7 @@ function App() {
   const prevStatusRef = useRef(null);
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const [isRecording, setIsRecording] = useState(false);
+  const [idleSeconds, setIdleSeconds] = useState(0);
   const { theme, setTheme, resolvedTheme } = useTheme();
   // ローカル時刻基準で 'YYYY-MM-DD' を取得
   const today = new Date().toLocaleDateString('sv-SE');
@@ -406,6 +407,16 @@ function App() {
     }
   };
 
+  const checkPCStatus = async () => {
+    try {
+      const res = await fetch(`${API_BASE}/status`);
+      const data = await res.json();
+      setIdleSeconds(data.idleSeconds);
+    } catch (err) {
+      console.error('PCステータスの取得に失敗:', err);
+    }
+  };
+
   const jumpToCurrentTime = () => {
     const now = new Date();
     const dateStr = now.toLocaleDateString('sv-SE');
@@ -438,7 +449,12 @@ function App() {
   useEffect(() => {
     fetchData();
     checkRecordingStatus();
-    const interval = setInterval(fetchData, 10000); // 10秒ごとにUI更新
+    checkPCStatus();
+    const interval = setInterval(() => {
+      fetchData();
+      checkRecordingStatus();
+      checkPCStatus();
+    }, 10000); // 10秒ごとにUI更新と記録状態の確認
     return () => clearInterval(interval);
   }, [dateRange, groupBy]); // 期間または集計単位が変更されたら再取得
 
@@ -734,43 +750,49 @@ function App() {
                       <Activity size={20} color={fatigueData.statusName === 'Critical' ? '#ef4444' : fatigueData.statusName === 'Strained' ? '#f97316' : '#10b981'} />
                       <span>疲労ゲージ</span>
                     </div>
-                    <div style={{ display: 'flex', gap: '0.6rem', alignItems: 'center', flexWrap: 'wrap' }}>
-                      <label style={{ display: 'flex', alignItems: 'center', gap: '0.25rem', fontSize: '0.75rem', color: '#94a3b8', cursor: 'pointer' }}>
-                        <input
-                          type="checkbox"
-                          checked={settings.show_mini_on_close === 'true'}
-                          onChange={async (e) => {
-                            const val = e.target.checked ? 'true' : 'false';
-                            handleSaveSetting('show_mini_on_close', val);
-                            if (val === 'false' && window.require) {
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                        <div className={`status-dot ${isRecording ? 'active' : 'inactive'}`} style={{ backgroundColor: isRecording ? '#10b981' : '#94a3b8', width: '8px', height: '8px', opacity: idleSeconds < 120 ? 1 : 0 }} title={isRecording ? 'アプリ記録中' : '記録停止中'} />
+                        <div className={`status-dot pc-active`} style={{ backgroundColor: '#6366f1', width: '8px', height: '8px', opacity: idleSeconds < 10 ? 1 : 0 }} title={idleSeconds < 10 ? 'PC操作中' : 'PC無操作'} />
+                      </div>
+                      <div style={{ display: 'flex', gap: '0.6rem', alignItems: 'center', flexWrap: 'wrap' }}>
+                        <label style={{ display: 'flex', alignItems: 'center', gap: '0.25rem', fontSize: '0.75rem', color: '#94a3b8', cursor: 'pointer' }}>
+                          <input
+                            type="checkbox"
+                            checked={settings.show_mini_on_close === 'true'}
+                            onChange={async (e) => {
+                              const val = e.target.checked ? 'true' : 'false';
+                              handleSaveSetting('show_mini_on_close', val);
+                              if (val === 'false' && window.require) {
+                                const { ipcRenderer } = window.require('electron');
+                                await ipcRenderer.invoke('mini-window:close');
+                              }
+                            }}
+                            style={{ width: '12px', height: '12px', accentColor: '#6366f1' }}
+                          />
+                          <span>メイン画面を閉じたら表示</span>
+                        </label>
+                        <button
+                          onClick={async () => {
+                            if (window.require) {
                               const { ipcRenderer } = window.require('electron');
-                              await ipcRenderer.invoke('mini-window:close');
+                              await ipcRenderer.invoke('mini-window:open');
                             }
                           }}
-                          style={{ width: '12px', height: '12px', accentColor: '#6366f1' }}
-                        />
-                        <span>メイン画面を閉じたら表示</span>
-                      </label>
-                      <button
-                        onClick={async () => {
-                          if (window.require) {
-                            const { ipcRenderer } = window.require('electron');
-                            await ipcRenderer.invoke('mini-window:open');
-                          }
-                        }}
-                        style={{
-                          padding: '0.3rem 0.6rem',
-                          fontSize: '0.75rem',
-                          borderRadius: '6px',
-                          background: 'rgba(99, 102, 241, 0.1)',
-                          border: '1px solid rgba(99, 102, 241, 0.2)',
-                          color: 'var(--primary)',
-                          cursor: 'pointer',
-                          fontWeight: '600'
-                        }}
-                      >
-                        ミニ画面を表示
-                      </button>
+                          style={{
+                            padding: '0.3rem 0.6rem',
+                            fontSize: '0.75rem',
+                            borderRadius: '6px',
+                            background: 'rgba(99, 102, 241, 0.1)',
+                            border: '1px solid rgba(99, 102, 241, 0.2)',
+                            color: 'var(--primary)',
+                            cursor: 'pointer',
+                            fontWeight: '600'
+                          }}
+                        >
+                          ミニ画面を表示
+                        </button>
+                      </div>
                     </div>
                   </div>
 
@@ -1527,6 +1549,10 @@ function App() {
             <span style={{ fontSize: '0.65rem', color: 'var(--mini-text-dim)' }}>
               稼働: {Math.floor(fatigueData.activeLogs * 10 / 60)}分
             </span>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+              <div className={`status-dot ${isRecording ? 'active' : 'inactive'}`} style={{ backgroundColor: isRecording ? '#10b981' : '#94a3b8', opacity: idleSeconds < 120 ? 1 : 0 }} title={isRecording ? 'アプリ記録中' : '記録停止中'} />
+              <div className={`status-dot pc-active`} style={{ backgroundColor: '#6366f1', opacity: idleSeconds < 10 ? 1 : 0 }} title={idleSeconds < 10 ? 'PC操作中' : 'PC無操作'} />
+            </div>
           </div>
         </div>
       </div >
@@ -1540,7 +1566,11 @@ function App() {
           {!isSidebarCollapsed && (
             <>
               <Activity size={32} color="#6366f1" />
-              <span>WorkPulse</span>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <span>WorkPulse</span>
+                </div>
+              </div>
             </>
           )}
           <button
@@ -1636,7 +1666,10 @@ function App() {
               <div className="agent-status-card">
 
                 <div style={{ fontSize: '0.9rem', color: isRecording ? '#10b981' : '#64748b', display: 'flex', alignItems: 'center', gap: '0.5rem', justifyContent: isSidebarCollapsed ? 'center' : 'flex-start' }}>
-                  <div className={`status-dot ${isRecording ? 'active' : 'inactive'}`} />
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', opacity: idleSeconds < 120 ? 1 : 0 }}>
+                    <div className={`status-dot`} style={{ backgroundColor: isRecording ? '#10b981' : '#94a3b8', width: '8px', height: '8px', borderRadius: '50%' }} title={isRecording ? 'アプリ記録中' : '記録停止中'} />
+                    <div className={`status-dot`} style={{ backgroundColor: '#6366f1', width: '8px', height: '8px', borderRadius: '50%', opacity: idleSeconds < 10 ? 1 : 0 }} title={idleSeconds < 10 ? 'PC操作中' : 'PC無操作'} />
+                  </div>
                   {!isSidebarCollapsed && (isRecording ? '記録中' : '停止中')}
                 </div>
                 <button
