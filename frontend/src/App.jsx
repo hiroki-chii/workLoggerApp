@@ -155,15 +155,17 @@ const PetIcon = ({ status, size = 40 }) => {
   } else if (status === 'Strained') {
     bodyColor = '#fb923c';
     className = 'pet-shake';
-    eyeLeft = <circle cx="14" cy="18" r="1.5" fill="#fff" />;
-    eyeRight = <circle cx="26" cy="18" r="1.5" fill="#fff" />;
-    mouth = <path d="M 17 25 Q 20 21 23 25" stroke="#fff" strokeWidth="2" fill="none" strokeLinecap="round" />;
+    // 左右非対称にするために目を左寄りに
+    eyeLeft = <circle cx="12" cy="18" r="1.5" fill="#fff" />;
+    eyeRight = <circle cx="24" cy="18" r="1.5" fill="#fff" />;
+    mouth = <path d="M 15 25 Q 18 21 21 25" stroke="#fff" strokeWidth="2" fill="none" strokeLinecap="round" />;
   } else { // Critical
     bodyColor = '#f87171';
     className = 'pet-danger-shake';
-    eyeLeft = <path d="M 12 16 L 16 20 M 16 16 L 12 20" stroke="#fff" strokeWidth="2" strokeLinecap="round" />;
-    eyeRight = <path d="M 24 16 L 28 20 M 28 16 L 24 20" stroke="#fff" strokeWidth="2" fill="none" strokeLinecap="round" />;
-    mouth = <path d="M 17 25 Q 20 21 23 25" stroke="#fff" strokeWidth="2" fill="none" strokeLinecap="round" />;
+    // 左右非対称にするために目を左寄りに
+    eyeLeft = <path d="M 10 16 L 14 20 M 14 16 L 10 20" stroke="#fff" strokeWidth="2" strokeLinecap="round" />;
+    eyeRight = <path d="M 22 16 L 26 20 M 26 16 L 22 20" stroke="#fff" strokeWidth="2" fill="none" strokeLinecap="round" />;
+    mouth = <path d="M 15 25 Q 18 21 21 25" stroke="#fff" strokeWidth="2" fill="none" strokeLinecap="round" />;
   }
 
   return (

@@ -1013,51 +1013,57 @@ select option {
 
 .pet-shake {
   display: inline-block;
-  animation: petShake 2s linear infinite;
+  transform-origin: center;
+  animation: petShake 3s ease-in-out infinite;
 }
 
 @keyframes petShake {
-
-  0%,
-  100% {
-    transform: translateX(0);
+  0% {
+    transform: translateX(-15px) scaleX(-1);
   }
 
-  25% {
-    transform: translateX(-5px);
+  49.9% {
+    transform: translateX(15px) scaleX(-1);
   }
 
   50% {
-    transform: translateX(0);
+    transform: translateX(15px) scaleX(1);
   }
 
-  75% {
-    transform: translateX(5px);
+  99.9% {
+    transform: translateX(-15px) scaleX(1);
+  }
+
+  100% {
+    transform: translateX(-15px) scaleX(-1);
   }
 }
 
 .pet-danger-shake {
   display: inline-block;
-  animation: petDangerShake 0.6s linear infinite;
+  transform-origin: center;
+  animation: petDangerShake 2s linear infinite;
 }
 
 @keyframes petDangerShake {
-
-  0%,
-  100% {
-    transform: translateX(0);
+  0% {
+    transform: translateX(-18px) scaleX(-1);
   }
 
-  25% {
-    transform: translateX(-6px);
+  49.9% {
+    transform: translateX(18px) scaleX(-1);
   }
 
   50% {
-    transform: translateX(0);
+    transform: translateX(18px) scaleX(1);
   }
 
-  75% {
-    transform: translateX(6px);
+  99.9% {
+    transform: translateX(-18px) scaleX(1);
+  }
+
+  100% {
+    transform: translateX(-18px) scaleX(-1);
   }
 }
 
