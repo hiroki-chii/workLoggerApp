@@ -639,7 +639,7 @@ function App() {
   };
 
   const StatusDots = ({ size = '8px', isRecording, idleSeconds }) => (
-    <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', opacity: idleSeconds < 120 ? 1 : 0 }}>
+    <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', opacity: idleSeconds < 60 ? 1 : 0 }}>
       <div className={`status-dot ${isRecording ? 'active' : 'inactive'}`} style={{ backgroundColor: isRecording ? '#10b981' : '#94a3b8', width: size, height: size, borderRadius: '50%' }} title={isRecording ? 'アプリ記録中' : '記録停止中'} />
       <div className={`status-dot pc-active`} style={{ backgroundColor: '#6366f1', width: size, height: size, borderRadius: '50%', opacity: idleSeconds < 10 ? 1 : 0 }} title={idleSeconds < 10 ? 'PC操作中' : 'PC無操作'} />
     </div>
@@ -1330,7 +1330,7 @@ function App() {
 
                     <h3>4. ミニ画面と疲労状態・稼働率</h3>
                     <p>
-                      <strong>60分スライディングウィンドウ方式</strong>に基づき、直近60分間の活動状況からリアルタイムに疲労状態（Restored / Calm / Focused / Strained / Critical）を自動算出します。過去の休息履歴に影響されず、直近の過集中を正確に検知可能です。
+                      <strong>90分スライディングウィンドウ方式</strong>に基づき、直近90分間の活動状況からリアルタイムに疲労状態（Restored / Calm / Focused / Strained / Critical）を自動算出します。過去の休息履歴に影響されず、直近の過集中を正確に検知可能です。
                     </p>
                     <p>
                       疲労状態が <strong>Critical（限界）</strong>に達したときは、休憩を促す警告アラートが画面上に通知されます（過度なアラートを防ぐため、切り替わった最初の一回のみ通知されます）。
@@ -1373,7 +1373,7 @@ function App() {
                         </div>
                       </li>
                       <li><strong>スリープ時の記録:</strong> PCがスリープ状態、シャットダウンされている間は記録されません。</li>
-                      <li><strong>操作していない時間の判定:</strong> 120秒間（2分）操作がない場合、作業の記録を自動的に停止します。無操作状態が続くと、稼働率が下がり、疲労状態が緩和されます。</li>
+                      <li><strong>操作していない時間の判定:</strong> 60秒間（1分）操作がない場合、作業の記録を自動的に停止します。無操作状態が続くと、稼働率が下がり、疲労状態が緩和されます。</li>
                     </ul>
                   </div>
                 </section>

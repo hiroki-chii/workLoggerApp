@@ -46,10 +46,10 @@ function getSettings() {
     rows.forEach(r => { settings[r.key] = r.value; });
     return {
       interval: parseInt(settings.sampling_interval || 10) * 1000,
-      idleThreshold: 120 // 2分（120秒）に固定
+      idleThreshold: 60 // 1分（60秒）に固定
     };
   } catch (err) {
-    return { interval: 10000, idleThreshold: 120 };
+    return { interval: 10000, idleThreshold: 60 };
   }
 }
 

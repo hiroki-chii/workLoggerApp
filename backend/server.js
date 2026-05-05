@@ -64,7 +64,7 @@ try {
 
   // デフォルト設定（初回のみ挿入、既存値は上書きしない）
   db.prepare('INSERT OR IGNORE INTO settings (key, value) VALUES (?, ?)').run('sampling_interval', '10');
-  db.prepare('INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)').run('idle_threshold', '120');
+  db.prepare('INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)').run('idle_threshold', '60');
   db.prepare('INSERT OR IGNORE INTO settings (key, value) VALUES (?, ?)').run('default_activity_color', '#6366f1');
   db.prepare('INSERT OR IGNORE INTO settings (key, value) VALUES (?, ?)').run('show_mini_on_close', 'true');
   db.prepare('INSERT OR IGNORE INTO settings (key, value) VALUES (?, ?)').run('mini_window_position', '右下');
@@ -193,24 +193,24 @@ app.get('/api/fatigue', (req, res) => {
     const nowMs = Date.now();
     const elapsedSeconds = Math.max(0, Math.floor((nowMs - startMs) / 1000));
 
-    // 2. 直近60分間のスライディングウィンドウ
-    const windowStartMs = nowMs - 60 * 60 * 1000;
+    // 2. 直近90分間のスライディングウィンドウ
+    const windowStartMs = nowMs - 90 * 60 * 1000;
     const startTimeInWindowMs = Math.max(startMs, windowStartMs);
     const elapsedInWindowSeconds = Math.max(0, Math.floor((nowMs - startTimeInWindowMs) / 1000));
 
-    // 直近60分間かつ本日分の有効ログ数を取得
+    // 直近90分間かつ本日分の有効ログ数を取得
     const windowActiveLogsObj = db.prepare(`
       SELECT COUNT(*) as activeLogsInWindow
       FROM logs
       WHERE date(timestamp, 'localtime') = date('now', 'localtime')
-        AND timestamp >= datetime('now', '-60 minutes')
+        AND timestamp >= datetime('now', '-90 minutes')
     `).get();
 
     const activeLogsInWindow = windowActiveLogsObj ? windowActiveLogsObj.activeLogsInWindow : 0;
     const samplingInterval = 11;
-    // スライディングウィンドウを常に60分(3600秒)として計算する。
-    // これにより、起動直後や30分経過時点などでも、過去60分のうちアプリ未起動の時間は「アイドル(休憩)」として扱われます。
-    const expectedLogsInWindow = Math.max(1, Math.floor(3600 / samplingInterval));
+    // スライディングウィンドウを常に90分(5400秒)として計算する。
+    // これにより、起動直後や30分経過時点などでも、過去90分のうちアプリ未起動の時間は「アイドル(休憩)」として扱われます。
+    const expectedLogsInWindow = Math.max(1, Math.floor(5400 / samplingInterval));
 
 
     // ウィンドウ内アイドル率を計算
