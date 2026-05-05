@@ -87,8 +87,6 @@ async function collect() {
           shouldLog = false;
         } else if (result.appName && result.appName !== 'None') {
           shouldLog = true;
-        } else {
-          // アプリ名が取得できない場合なども、とりあえず操作中とは判定しない（または現状維持）
         }
 
         if (shouldLog) {

@@ -638,6 +638,13 @@ function App() {
     }
   };
 
+  const StatusDots = ({ size = '8px', isRecording, idleSeconds }) => (
+    <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', opacity: idleSeconds < 120 ? 1 : 0 }}>
+      <div className={`status-dot ${isRecording ? 'active' : 'inactive'}`} style={{ backgroundColor: isRecording ? '#10b981' : '#94a3b8', width: size, height: size, borderRadius: '50%' }} title={isRecording ? 'アプリ記録中' : '記録停止中'} />
+      <div className={`status-dot pc-active`} style={{ backgroundColor: '#6366f1', width: size, height: size, borderRadius: '50%', opacity: idleSeconds < 10 ? 1 : 0 }} title={idleSeconds < 10 ? 'PC操作中' : 'PC無操作'} />
+    </div>
+  );
+
   const renderDateHeader = (title, showRange = true) => (
     <header className="header fade-in">
       <div>
@@ -751,10 +758,7 @@ function App() {
                       <span>疲労ゲージ</span>
                     </div>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-                        <div className={`status-dot ${isRecording ? 'active' : 'inactive'}`} style={{ backgroundColor: isRecording ? '#10b981' : '#94a3b8', width: '8px', height: '8px', opacity: idleSeconds < 120 ? 1 : 0 }} title={isRecording ? 'アプリ記録中' : '記録停止中'} />
-                        <div className={`status-dot pc-active`} style={{ backgroundColor: '#6366f1', width: '8px', height: '8px', opacity: idleSeconds < 10 ? 1 : 0 }} title={idleSeconds < 10 ? 'PC操作中' : 'PC無操作'} />
-                      </div>
+                      <StatusDots isRecording={isRecording} idleSeconds={idleSeconds} />
                       <div style={{ display: 'flex', gap: '0.6rem', alignItems: 'center', flexWrap: 'wrap' }}>
                         <label style={{ display: 'flex', alignItems: 'center', gap: '0.25rem', fontSize: '0.75rem', color: '#94a3b8', cursor: 'pointer' }}>
                           <input
@@ -1545,15 +1549,12 @@ function App() {
               <span>ペットを表示</span>
             </label>
           </div>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <span style={{ fontSize: '0.65rem', color: 'var(--mini-text-dim)' }}>
-              稼働: {Math.floor(fatigueData.activeLogs * 10 / 60)}分
-            </span>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-              <div className={`status-dot ${isRecording ? 'active' : 'inactive'}`} style={{ backgroundColor: isRecording ? '#10b981' : '#94a3b8', opacity: idleSeconds < 120 ? 1 : 0 }} title={isRecording ? 'アプリ記録中' : '記録停止中'} />
-              <div className={`status-dot pc-active`} style={{ backgroundColor: '#6366f1', opacity: idleSeconds < 10 ? 1 : 0 }} title={idleSeconds < 10 ? 'PC操作中' : 'PC無操作'} />
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <span style={{ fontSize: '0.65rem', color: 'var(--mini-text-dim)' }}>
+                稼働: {Math.floor(fatigueData.activeLogs * 10 / 60)}分
+              </span>
+              <StatusDots isRecording={isRecording} idleSeconds={idleSeconds} />
             </div>
-          </div>
         </div>
       </div >
     );
@@ -1666,10 +1667,6 @@ function App() {
               <div className="agent-status-card">
 
                 <div style={{ fontSize: '0.9rem', color: isRecording ? '#10b981' : '#64748b', display: 'flex', alignItems: 'center', gap: '0.5rem', justifyContent: isSidebarCollapsed ? 'center' : 'flex-start' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', opacity: idleSeconds < 120 ? 1 : 0 }}>
-                    <div className={`status-dot`} style={{ backgroundColor: isRecording ? '#10b981' : '#94a3b8', width: '8px', height: '8px', borderRadius: '50%' }} title={isRecording ? 'アプリ記録中' : '記録停止中'} />
-                    <div className={`status-dot`} style={{ backgroundColor: '#6366f1', width: '8px', height: '8px', borderRadius: '50%', opacity: idleSeconds < 10 ? 1 : 0 }} title={idleSeconds < 10 ? 'PC操作中' : 'PC無操作'} />
-                  </div>
                   {!isSidebarCollapsed && (isRecording ? '記録中' : '停止中')}
                 </div>
                 <button
