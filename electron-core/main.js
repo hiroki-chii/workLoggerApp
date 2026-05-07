@@ -313,6 +313,24 @@ function startApp() {
     return true;
   });
 
+  ipcMain.handle('alert:confirm', async (event, { title, message }) => {
+    const parentWin = mainWindow && mainWindow.isVisible() ? mainWindow : (miniWindow && miniWindow.isVisible() ? miniWindow : null);
+    if (parentWin) {
+      if (parentWin.isMinimized()) parentWin.restore();
+      parentWin.show();
+      parentWin.focus();
+    }
+    const result = await dialog.showMessageBox(parentWin, {
+      type: 'question',
+      title: title || 'WorkPulse 確認',
+      message: message || '本当によろしいですか？',
+      buttons: ['はい', 'キャンセル'],
+      defaultId: 0,
+      cancelId: 1
+    });
+    return result.response === 0;
+  });
+
 
   // 初期化
   startServer();

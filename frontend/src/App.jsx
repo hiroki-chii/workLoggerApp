@@ -479,6 +479,22 @@ function App() {
   };
 
   const handleModeChange = async (newMode) => {
+    // Critical時にポモドーロモードへ切り替える際の警告
+    if (newMode.startsWith('pomodoro') && fatigueData.currentMode === 'tracking' && fatigueData.statusName === 'Critical') {
+      const message = "現在、疲労状態が『Critical』です。\nポモドーロモードで作業を再開する前に、まずは十分な休憩を取ることを強くお勧めします。\nこのまま切り替えますか？";
+      
+      if (window.require) {
+        const { ipcRenderer } = window.require('electron');
+        const confirmed = await ipcRenderer.invoke('alert:confirm', { 
+          title: '休憩のおすすめ',
+          message 
+        });
+        if (!confirmed) return;
+      } else {
+        if (!window.confirm(message)) return;
+      }
+    }
+
     try {
       const now = Date.now().toString();
       let initialRemainingMs = '0';
