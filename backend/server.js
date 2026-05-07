@@ -69,6 +69,10 @@ try {
   db.prepare('INSERT OR IGNORE INTO settings (key, value) VALUES (?, ?)').run('show_mini_on_close', 'true');
   db.prepare('INSERT OR IGNORE INTO settings (key, value) VALUES (?, ?)').run('mini_window_position', '右下');
   db.prepare('INSERT OR IGNORE INTO settings (key, value) VALUES (?, ?)').run('show_pet_in_mini', 'true');
+  db.prepare('INSERT OR IGNORE INTO settings (key, value) VALUES (?, ?)').run('current_mode', 'tracking');
+  db.prepare('INSERT OR IGNORE INTO settings (key, value) VALUES (?, ?)').run('pomodoro_start_ms', Date.now().toString());
+  db.prepare('INSERT OR IGNORE INTO settings (key, value) VALUES (?, ?)').run('pomodoro_status', 'running');
+  db.prepare('INSERT OR IGNORE INTO settings (key, value) VALUES (?, ?)').run('pomodoro_remaining_ms', '0');
   // 既存データがある場合は「右上」を「右下」へ補正
   db.prepare("UPDATE settings SET value = '右下' WHERE key = 'mini_window_position' AND value = '右上'").run();
   console.log('[Server] Database initialized (Better-SQLite3, WAL mode) at: %s', DB_PATH);
@@ -168,6 +172,11 @@ app.delete('/api/logs/clear', (req, res) => {
 
 app.get('/api/fatigue', (req, res) => {
   try {
+    const settingsRows = db.prepare('SELECT * FROM settings').all();
+    const settings = settingsRows.reduce((acc, curr) => ({ ...acc, [curr.key]: curr.value }), {});
+    const currentMode = settings.current_mode || 'tracking';
+    const pomodoroStartMs = parseInt(settings.pomodoro_start_ms || Date.now());
+
     const logInfo = db.prepare(`
       SELECT 
         MIN(timestamp) as startTime, 
@@ -176,61 +185,81 @@ app.get('/api/fatigue', (req, res) => {
       WHERE date(timestamp, 'localtime') = date('now', 'localtime')
     `).get();
 
-    if (!logInfo || !logInfo.startTime || logInfo.activeLogs === 0) {
-      return res.json({
-        fatigueLevel: 0,
-        idleRate: 0,
-        statusName: 'Initializing',
-        startTime: null,
-        elapsedSeconds: 0,
-        activeLogs: 0,
-        expectedLogs: 0
-      });
-    }
-
-    const startTimeISO = logInfo.startTime.replace(' ', 'T') + 'Z';
-    const startMs = new Date(startTimeISO).getTime();
-    const nowMs = Date.now();
-    const elapsedSeconds = Math.max(0, Math.floor((nowMs - startMs) / 1000));
-
-    // 2. 直近90分間のスライディングウィンドウ
-    const windowStartMs = nowMs - 90 * 60 * 1000;
-    const startTimeInWindowMs = Math.max(startMs, windowStartMs);
-    const elapsedInWindowSeconds = Math.max(0, Math.floor((nowMs - startTimeInWindowMs) / 1000));
-
-    // 直近90分間かつ本日分の有効ログ数を取得
-    const windowActiveLogsObj = db.prepare(`
-      SELECT COUNT(*) as activeLogsInWindow
-      FROM logs
-      WHERE date(timestamp, 'localtime') = date('now', 'localtime')
-        AND timestamp >= datetime('now', '-90 minutes')
-    `).get();
-
-    const activeLogsInWindow = windowActiveLogsObj ? windowActiveLogsObj.activeLogsInWindow : 0;
+    // 共通の稼働データ
     const samplingInterval = 11;
-    // スライディングウィンドウを常に90分(5400秒)として計算する。
-    // これにより、起動直後や30分経過時点などでも、過去90分のうちアプリ未起動の時間は「アイドル(休憩)」として扱われます。
-    const expectedLogsInWindow = Math.max(1, Math.floor(5400 / samplingInterval));
+    const nowMs = Date.now();
+    let startTimeISO = null;
+    let elapsedSeconds = 0;
+    let activeLogs = 0;
 
-
-    // ウィンドウ内アイドル率を計算
-    const idleRatePercent = Math.max(0, Math.min(100, Math.round(((expectedLogsInWindow - activeLogsInWindow) / expectedLogsInWindow) * 100)));
-
-    let statusName = 'Critical';
-    if (idleRatePercent >= 40) {
-      statusName = 'Restored';
-    } else if (idleRatePercent >= 25) {
-      statusName = 'Calm';
-    } else if (idleRatePercent >= 15) {
-      statusName = 'Focused';
-    } else if (idleRatePercent >= 10) {
-      statusName = 'Strained';
-    } else {
-      statusName = 'Critical';
+    if (logInfo && logInfo.startTime && logInfo.activeLogs > 0) {
+      startTimeISO = logInfo.startTime.replace(' ', 'T') + 'Z';
+      const startMs = new Date(startTimeISO).getTime();
+      elapsedSeconds = Math.max(0, Math.floor((nowMs - startMs) / 1000));
+      activeLogs = logInfo.activeLogs;
     }
 
-    // 疲労度 = 100 - アイドル率 (%)
-    const fatigueLevel = Math.max(0, Math.min(100, 100 - idleRatePercent));
+    // 稼働率計算 (トラッキングモードの時のみ)
+    let idleRatePercent = 0;
+    let fatigueLevel = 0;
+    let statusName = 'Initializing';
+
+    if (currentMode === 'tracking' && activeLogs > 0) {
+      const windowActiveLogsObj = db.prepare(`
+        SELECT COUNT(*) as activeLogsInWindow
+        FROM logs
+        WHERE date(timestamp, 'localtime') = date('now', 'localtime')
+          AND timestamp >= datetime('now', '-60 minutes')
+      `).get();
+
+      const activeLogsInWindow = windowActiveLogsObj ? windowActiveLogsObj.activeLogsInWindow : 0;
+      const expectedLogsInWindow = Math.max(1, Math.floor(3600 / samplingInterval));
+      idleRatePercent = Math.max(0, Math.min(100, Math.round(((expectedLogsInWindow - activeLogsInWindow) / expectedLogsInWindow) * 100)));
+      fatigueLevel = Math.max(0, Math.min(100, 100 - idleRatePercent));
+
+      if (idleRatePercent >= 40) statusName = 'Restored';
+      else if (idleRatePercent >= 25) statusName = 'Calm';
+      else if (idleRatePercent >= 15) statusName = 'Focused';
+      else if (idleRatePercent >= 10) statusName = 'Strained';
+      else statusName = 'Critical';
+    } else if (activeLogs > 0) {
+      statusName = 'Active'; // ポモドーロ中のデフォルト表示用
+    }
+
+    // ポモドーロ情報の計算
+    let pomodoro = null;
+    if (currentMode && currentMode.startsWith('pomodoro')) {
+      const workMin = parseInt(currentMode.replace('pomodoro', ''));
+      const breakMin = workMin === 15 ? 3 : (workMin === 25 ? 5 : 10);
+      
+      const pomodoroStatus = db.prepare('SELECT value FROM settings WHERE key = ?').get('pomodoro_status').value || 'running';
+      const pomodoroPausedRemaining = parseInt(db.prepare('SELECT value FROM settings WHERE key = ?').get('pomodoro_remaining_ms').value || '0');
+
+      const cycleMs = (workMin + breakMin) * 60 * 1000;
+      const workMinMs = workMin * 60 * 1000;
+      let isWork = true;
+      let remainingMs = 0;
+
+      if (pomodoroStatus === 'paused') {
+        remainingMs = pomodoroPausedRemaining;
+        const currentCyclePos = (Date.now() - pomodoroStartMs) % cycleMs;
+        isWork = currentCyclePos < workMinMs;
+      } else {
+        const elapsedMs = Date.now() - pomodoroStartMs;
+        const currentCyclePos = elapsedMs % cycleMs;
+        isWork = currentCyclePos < workMinMs;
+        remainingMs = isWork ? (workMinMs - currentCyclePos) : (cycleMs - currentCyclePos);
+      }
+
+      pomodoro = {
+        mode: currentMode,
+        phase: isWork ? 'work' : 'break',
+        remainingSeconds: Math.ceil(remainingMs / 1000),
+        workMin,
+        breakMin,
+        status: pomodoroStatus
+      };
+    }
 
     res.json({
       fatigueLevel,
@@ -238,8 +267,10 @@ app.get('/api/fatigue', (req, res) => {
       statusName,
       startTime: startTimeISO,
       elapsedSeconds,
-      activeLogs: logInfo.activeLogs,
-      expectedLogs: Math.max(1, Math.floor(elapsedSeconds / samplingInterval))
+      activeLogs,
+      expectedLogs: Math.max(1, Math.floor(elapsedSeconds / samplingInterval)),
+      currentMode,
+      pomodoro
     });
   } catch (err) {
     console.error('[Server] Fatigue error:', err);
@@ -267,6 +298,53 @@ app.get('/api/debug-db', (req, res) => {
   }
 });
 
+
+app.post('/api/pomodoro/control', (req, res) => {
+  try {
+    const { action } = req.body;
+    const currentMode = db.prepare('SELECT value FROM settings WHERE key = ?').get('current_mode').value;
+    if (!currentMode.startsWith('pomodoro')) {
+      return res.status(400).json({ error: 'Not in Pomodoro mode' });
+    }
+
+    const workMin = parseInt(currentMode.replace('pomodoro', ''));
+    const breakMin = workMin === 15 ? 3 : (workMin === 25 ? 5 : 10);
+    const cycleMs = (workMin + breakMin) * 60 * 1000;
+    const workMinMs = workMin * 60 * 1000;
+
+    const pomodoroStartMs = parseInt(db.prepare('SELECT value FROM settings WHERE key = ?').get('pomodoro_start_ms').value);
+    const elapsedMs = Date.now() - pomodoroStartMs;
+    const currentCyclePos = elapsedMs % cycleMs;
+    const isWork = currentCyclePos < workMinMs;
+    const currentRemainingMs = isWork ? (workMinMs - currentCyclePos) : (cycleMs - currentCyclePos);
+
+    if (action === 'pause') {
+      db.prepare('INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)').run('pomodoro_status', 'paused');
+      db.prepare('INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)').run('pomodoro_remaining_ms', currentRemainingMs.toString());
+    } else if (action === 'start') {
+      const pomodoroStatus = db.prepare('SELECT value FROM settings WHERE key = ?').get('pomodoro_status').value;
+      if (pomodoroStatus === 'paused') {
+        const pausedRemainingMs = parseInt(db.prepare('SELECT value FROM settings WHERE key = ?').get('pomodoro_remaining_ms').value);
+        // 新しい開始時刻を計算（サイクル位置を維持するように）
+        // サイクル内位置 = (isWork ? workMinMs : cycleMs) - pausedRemainingMs
+        // newStartMs = now - サイクル内位置
+        const newCyclePos = (isWork ? workMinMs : cycleMs) - pausedRemainingMs;
+        const newStartMs = Date.now() - newCyclePos;
+        db.prepare('INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)').run('pomodoro_start_ms', newStartMs.toString());
+      }
+      db.prepare('INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)').run('pomodoro_status', 'running');
+    } else if (action === 'reset') {
+      db.prepare('INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)').run('pomodoro_start_ms', Date.now().toString());
+      db.prepare('INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)').run('pomodoro_status', 'running');
+      db.prepare('INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)').run('pomodoro_remaining_ms', '0');
+    }
+
+    res.json({ success: true });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: err.message });
+  }
+});
 
 app.get('/api/settings', (req, res) => {
   try {

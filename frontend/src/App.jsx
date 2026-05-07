@@ -122,7 +122,15 @@ const formatNumberWithSuffix = (num) => {
   return `${ceiled.toFixed(1)}${unit}`;
 };
 
-const getFatigueAdvice = (statusName) => {
+const getFatigueAdvice = (statusName, pomodoro = null, localRemaining = null) => {
+  if (pomodoro) {
+    const displaySec = localRemaining !== null ? localRemaining : pomodoro.remainingSeconds;
+    if (pomodoro.phase === 'work') {
+      return `作業フェーズです。\n集中して進めましょう！`;
+    } else {
+      return `休憩フェーズです。\nしっかり休んでリフレッシュ！`;
+    }
+  }
   if (statusName === 'Critical') return "少し頑張りすぎていませんか？\nそろそろ小休憩を！";
   if (statusName === 'Strained') return "そろそろ疲れていませんか？\n深呼吸でリフレッシュを！";
   if (statusName === 'Focused') return "良いペースです。\nこの調子で進めましょう！";
@@ -211,7 +219,9 @@ function App() {
     startTime: null,
     elapsedSeconds: 0,
     activeLogs: 0,
-    expectedLogs: 0
+    expectedLogs: 0,
+    currentMode: 'tracking',
+    pomodoro: null
   });
 
   const [loading, setLoading] = useState(true);
@@ -236,6 +246,49 @@ function App() {
   const [selectedSlot, setSelectedSlot] = useState(null);
   const [isBreakdownModalOpen, setIsBreakdownModalOpen] = useState(false);
   const [breakdownGroupBy, setBreakdownGroupBy] = useState('windowTitle'); // 'appName', 'windowTitle'
+  const lastPomodoroPhaseRef = useRef(null);
+  const [localRemainingSeconds, setLocalRemainingSeconds] = useState(null);
+  const lastSyncTimeRef = useRef(null);
+
+  // ポモドーロの1秒刻みカウントダウン
+  useEffect(() => {
+    if (localRemainingSeconds === null || localRemainingSeconds <= 0 || fatigueData.pomodoro?.status === 'paused') return;
+
+    const timer = setInterval(() => {
+      setLocalRemainingSeconds(prev => {
+        if (prev === null || prev <= 0) return prev;
+        return prev - 1;
+      });
+    }, 1000);
+
+    return () => clearInterval(timer);
+  }, [localRemainingSeconds !== null, fatigueData.pomodoro?.status]);
+
+  useEffect(() => {
+    // ミニ画面（ウィジェット）ではアラートを出さないようにして二重通知を防止
+    if (window.location.search.includes('mini=true')) return;
+
+    if (fatigueData.pomodoro && fatigueData.pomodoro.phase !== lastPomodoroPhaseRef.current) {
+      if (lastPomodoroPhaseRef.current !== null) {
+        const title = fatigueData.pomodoro.phase === 'work' ? '【作業開始】' : '【休憩時間】';
+        const message = fatigueData.pomodoro.phase === 'work'
+          ? `${fatigueData.pomodoro.workMin}分間の集中タイムです。頑張りましょう！`
+          : `${fatigueData.pomodoro.breakMin}分間の休憩です。リラックスしてください。`;
+
+        if (window.require) {
+          const { ipcRenderer } = window.require('electron');
+          ipcRenderer.invoke('alert:danger', `${title}\n\n${message}`);
+        } else if (typeof window !== 'undefined' && window.Notification) {
+          new window.Notification("WorkPulse からのお知らせ", {
+            body: `${title} ${message}`
+          });
+        }
+      }
+      lastPomodoroPhaseRef.current = fatigueData.pomodoro.phase;
+    } else if (!fatigueData.pomodoro) {
+      lastPomodoroPhaseRef.current = null;
+    }
+  }, [fatigueData.pomodoro?.phase, fatigueData.pomodoro]);
 
   const [windowRules, setWindowRules] = useState([]);
   const [editingRuleId, setEditingRuleId] = useState(null);
@@ -275,6 +328,14 @@ function App() {
       if (fatigueRes && fatigueRes.ok) {
         const fData = await fatigueRes.json();
         setFatigueData(fData);
+
+        // ポモドーロの残り時間をローカルで同期
+        if (fData.pomodoro) {
+          setLocalRemainingSeconds(fData.pomodoro.remainingSeconds);
+        } else {
+          setLocalRemainingSeconds(null);
+        }
+
         const now = Date.now();
         if (!window.location.search.includes('mini=true') && fData.statusName === 'Critical') {
           if (prevStatusRef.current !== 'Critical') {
@@ -414,6 +475,57 @@ function App() {
       setIdleSeconds(data.idleSeconds);
     } catch (err) {
       console.error('PCステータスの取得に失敗:', err);
+    }
+  };
+
+  const handleModeChange = async (newMode) => {
+    try {
+      const now = Date.now().toString();
+      let initialRemainingMs = '0';
+      if (newMode.startsWith('pomodoro')) {
+        const mins = parseInt(newMode.replace('pomodoro', ''));
+        initialRemainingMs = (mins * 60 * 1000).toString();
+      }
+
+      await Promise.all([
+        fetch(`${API_BASE}/settings`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ key: 'current_mode', value: newMode })
+        }),
+        fetch(`${API_BASE}/settings`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ key: 'pomodoro_start_ms', value: now })
+        }),
+        // モード変更時はステータスを paused に、残り時間をフルに設定（自動再生しない）
+        fetch(`${API_BASE}/settings`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ key: 'pomodoro_status', value: newMode === 'tracking' ? 'running' : 'paused' })
+        }),
+        fetch(`${API_BASE}/settings`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ key: 'pomodoro_remaining_ms', value: initialRemainingMs })
+        })
+      ]);
+      fetchData();
+    } catch (err) {
+      console.error('Mode change error:', err);
+    }
+  };
+
+  const handlePomodoroControl = async (action) => {
+    try {
+      await fetch(`${API_BASE}/pomodoro/control`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action })
+      });
+      fetchData();
+    } catch (err) {
+      console.error('Pomodoro control error:', err);
     }
   };
 
@@ -755,7 +867,26 @@ function App() {
                   <div className="card-title" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.5rem', marginBottom: 0 }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                       <Activity size={20} color={fatigueData.statusName === 'Critical' ? '#ef4444' : fatigueData.statusName === 'Strained' ? '#f97316' : '#10b981'} />
-                      <span>疲労ゲージ</span>
+                      <select
+                        value={fatigueData.currentMode}
+                        onChange={(e) => handleModeChange(e.target.value)}
+                        style={{
+                          marginLeft: '0.5rem',
+                          padding: '0.2rem 0.4rem',
+                          fontSize: '1rem',
+                          borderRadius: '6px',
+                          background: 'rgba(255,255,255,0.05)',
+                          border: '1px solid rgba(255,255,255,0.1)',
+                          color: 'var(--text)',
+                          cursor: 'pointer',
+                          outline: 'none'
+                        }}
+                      >
+                        <option value="tracking">トラッキング</option>
+                        <option value="pomodoro15">ポモドーロ１５</option>
+                        <option value="pomodoro25">ポモドーロ２５</option>
+                        <option value="pomodoro50">ポモドーロ５０</option>
+                      </select>
                     </div>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
                       <StatusDots isRecording={isRecording} idleSeconds={idleSeconds} />
@@ -800,28 +931,66 @@ function App() {
                     </div>
                   </div>
 
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem', flex: 1, justifyContent: 'center' }}>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', flex: 1, justifyContent: 'center' }}>
+                    {/* 1行目: ステータス名とペット */}
                     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
-                        <span style={{ fontSize: '2rem', fontWeight: '800', color: fatigueData.statusName === 'Critical' ? '#ef4444' : fatigueData.statusName === 'Strained' ? '#f97316' : 'var(--text)', lineHeight: 1 }}>
-                          {fatigueData.statusName === 'Initializing' ? 'Initializing . . .' : fatigueData.statusName}
-                        </span>
+                      <span style={{ fontSize: '2rem', fontWeight: '800', color: fatigueData.pomodoro ? (fatigueData.pomodoro.phase === 'work' ? 'var(--primary)' : '#10b981') : (fatigueData.statusName === 'Critical' ? '#ef4444' : fatigueData.statusName === 'Strained' ? '#f97316' : 'var(--text)'), lineHeight: 1 }}>
+                        {fatigueData.pomodoro ? (fatigueData.pomodoro.phase === 'work' ? 'WORKING' : 'BREAK') : (fatigueData.statusName === 'Initializing' ? 'Initializing . . .' : fatigueData.statusName)}
+                      </span>
+                      <div style={{ visibility: fatigueData.statusName === 'Initializing' ? 'hidden' : 'visible' }}>
+                        <PetIcon status={fatigueData.pomodoro ? (fatigueData.pomodoro.phase === 'work' ? 'Focused' : 'Restored') : fatigueData.statusName} size={48} />
+                      </div>
+                    </div>
+
+                    {/* 2行目: 残り時間/稼働率 と 操作ボタン */}
+                    <div style={{ display: 'flex', alignItems: 'center', width: '100%' }}>
+                      {fatigueData.pomodoro ? (
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
+                          <span style={{ fontSize: '1.7rem', fontWeight: '700', color: 'var(--text)' }}>
+                            残り {Math.floor((localRemainingSeconds ?? fatigueData.pomodoro.remainingSeconds) / 60)}:{((localRemainingSeconds ?? fatigueData.pomodoro.remainingSeconds) % 60).toString().padStart(2, '0')}
+                          </span>
+                          <div style={{ display: 'flex', gap: '0.4rem' }}>
+                            {fatigueData.pomodoro.status === 'paused' ? (
+                              <button
+                                onClick={() => handlePomodoroControl('start')}
+                                style={{ padding: '0.3rem 0.75rem', fontSize: '0.75rem', background: 'var(--primary)', color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer', fontWeight: '600' }}
+                              >
+                                スタート
+                              </button>
+                            ) : (
+                              <button
+                                onClick={() => handlePomodoroControl('pause')}
+                                style={{ padding: '0.3rem 0.75rem', fontSize: '0.75rem', background: 'rgba(255,255,255,0.08)', color: 'var(--text)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '6px', cursor: 'pointer', fontWeight: '600' }}
+                              >
+                                一時停止
+                              </button>
+                            )}
+                            <button
+                              onClick={() => handlePomodoroControl('reset')}
+                              style={{ padding: '0.3rem 0.75rem', fontSize: '0.75rem', background: 'rgba(255,255,255,0.08)', color: 'var(--text)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '6px', cursor: 'pointer', fontWeight: '600' }}
+                            >
+                              リセット
+                            </button>
+                          </div>
+                        </div>
+                      ) : (
                         <span style={{ fontSize: '0.85rem', color: '#94a3b8' }}>
                           (稼働率 {fatigueData.statusName === 'Initializing' ? '集計中. . .' : `${100 - fatigueData.idleRate}%`})
                         </span>
-                      </div>
-                      <div style={{ marginRight: '1.5rem', marginTop: '-0.25rem', visibility: fatigueData.statusName === 'Initializing' ? 'hidden' : 'visible' }}>
-                        <PetIcon status={fatigueData.statusName} size={48} />
-                      </div>
+                      )}
                     </div>
 
                     <div style={{ height: '8px', background: 'rgba(255, 255, 255, 0.05)', borderRadius: '4px', overflow: 'hidden' }}>
                       <div style={{
                         height: '100%',
-                        width: fatigueData.statusName === 'Initializing' ? 0 : `${100 - fatigueData.idleRate}%`,
-                        background: fatigueData.statusName === 'Critical' ? 'linear-gradient(90deg, #ef4444, #f87171)' : fatigueData.statusName === 'Strained' ? 'linear-gradient(90deg, #f97316, #fb923c)' : 'linear-gradient(90deg, #10b981, #34d399)',
+                        width: fatigueData.pomodoro
+                          ? `${Math.max(0, Math.min(100, (((fatigueData.pomodoro.phase === 'work' ? fatigueData.pomodoro.workMin : fatigueData.pomodoro.breakMin) * 60 - (localRemainingSeconds ?? fatigueData.pomodoro.remainingSeconds)) / ((fatigueData.pomodoro.phase === 'work' ? fatigueData.pomodoro.workMin : fatigueData.pomodoro.breakMin) * 60)) * 100))}%`
+                          : (fatigueData.statusName === 'Initializing' ? 0 : `${100 - fatigueData.idleRate}%`),
+                        background: fatigueData.pomodoro
+                          ? (fatigueData.pomodoro.phase === 'work' ? 'linear-gradient(90deg, var(--primary), var(--accent))' : 'linear-gradient(90deg, #10b981, #34d399)')
+                          : (fatigueData.statusName === 'Critical' ? 'linear-gradient(90deg, #ef4444, #f87171)' : fatigueData.statusName === 'Strained' ? 'linear-gradient(90deg, #f97316, #fb923c)' : 'linear-gradient(90deg, #10b981, #34d399)'),
                         borderRadius: '4px',
-                        transition: 'width 0.5s ease'
+                        transition: 'width 1s linear'
                       }} />
                     </div>
 
@@ -857,7 +1026,7 @@ function App() {
                       lineHeight: '1.4',
                       whiteSpace: 'pre-line'
                     }}>
-                      {getFatigueAdvice(fatigueData.statusName)}
+                      {getFatigueAdvice(fatigueData.statusName, fatigueData.pomodoro, localRemainingSeconds)}
                     </div>
                   </div>
                 </div>
@@ -1017,6 +1186,69 @@ function App() {
                   <Settings size={20} /> アプリケーション設定
                 </div>
                 <div style={{ padding: '1.5rem' }}>
+                  {/* 稼働モード設定セクション */}
+                  <div style={{ marginBottom: '2rem', padding: '1.5rem', background: 'rgba(255,255,255,0.02)', borderRadius: '16px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '1.5rem' }}>
+                      <Activity size={20} color="#10b981" />
+                      <div>
+                        <div style={{ fontWeight: '600' }}>稼働モード</div>
+                        <div style={{ fontSize: '0.8rem', color: '#94a3b8' }}>休憩を促す基準を選択します。</div>
+                      </div>
+                    </div>
+                    <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap' }}>
+                      {[
+                        { id: 'tracking', name: 'トラッキング' },
+                        { id: 'pomodoro15', name: 'ポモドーロ１５' },
+                        { id: 'pomodoro25', name: 'ポモドーロ２５' },
+                        { id: 'pomodoro50', name: 'ポモドーロ５０' }
+                      ].map(mode => (
+                        <button
+                          key={mode.id}
+                          onClick={() => handleModeChange(mode.id)}
+                          style={{
+                            padding: '0.75rem 1.25rem',
+                            borderRadius: '12px',
+                            background: fatigueData.currentMode === mode.id ? 'var(--primary)' : 'rgba(255,255,255,0.05)',
+                            color: fatigueData.currentMode === mode.id ? '#fff' : 'var(--text)',
+                            border: fatigueData.currentMode === mode.id ? 'none' : '1px solid rgba(255,255,255,0.1)',
+                            cursor: 'pointer',
+                            fontWeight: '600',
+                            fontSize: '0.9rem',
+                            transition: 'all 0.2s',
+                            boxShadow: fatigueData.currentMode === mode.id ? '0 4px 12px rgba(99, 102, 241, 0.3)' : 'none'
+                          }}
+                        >
+                          {mode.name}
+                        </button>
+                      ))}
+                    </div>
+                    {fatigueData.pomodoro && (
+                      <div style={{ marginTop: '1.5rem', display: 'flex', gap: '0.75rem', alignItems: 'center' }}>
+                        <div style={{ fontSize: '0.85rem', color: '#94a3b8', marginRight: '0.5rem' }}>ポモドーロ操作:</div>
+                        {fatigueData.pomodoro.status === 'paused' ? (
+                          <button
+                            onClick={() => handlePomodoroControl('start')}
+                            style={{ padding: '0.5rem 1rem', borderRadius: '8px', background: 'var(--primary)', color: 'white', border: 'none', cursor: 'pointer', fontSize: '0.85rem', fontWeight: '600' }}
+                          >
+                            スタート
+                          </button>
+                        ) : (
+                          <button
+                            onClick={() => handlePomodoroControl('pause')}
+                            style={{ padding: '0.5rem 1rem', borderRadius: '8px', background: 'rgba(255,255,255,0.05)', color: 'var(--text)', border: '1px solid rgba(255,255,255,0.1)', cursor: 'pointer', fontSize: '0.85rem', fontWeight: '600' }}
+                          >
+                            一時停止
+                          </button>
+                        )}
+                        <button
+                          onClick={() => handlePomodoroControl('reset')}
+                          style={{ padding: '0.5rem 1rem', borderRadius: '8px', background: 'rgba(255,255,255,0.05)', color: 'var(--text)', border: '1px solid rgba(255,255,255,0.1)', cursor: 'pointer', fontSize: '0.85rem', fontWeight: '600' }}
+                        >
+                          リセット
+                        </button>
+                      </div>
+                    )}
+                  </div>
 
 
 
@@ -1330,11 +1562,22 @@ function App() {
 
                     <h3>4. ミニ画面と疲労状態・稼働率</h3>
                     <p>
-                      <strong>90分スライディングウィンドウ方式</strong>に基づき、直近90分間の活動状況からリアルタイムに疲労状態（Restored / Calm / Focused / Strained / Critical）を自動算出します。過去の休息履歴に影響されず、直近の過集中を正確に検知可能です。
+                      <strong>90分スライディングウィンドウ方式</strong>に基づき、直近90分間の活動状況からリアルタイムに疲労状態（Restored / Calm / Focused / Strained / Critical）を自動算出します。
                     </p>
                     <p>
-                      疲労状態が <strong>Critical（限界）</strong>に達したときは、休憩を促す警告アラートが画面上に通知されます（過度なアラートを防ぐため、切り替わった最初の一回のみ通知されます）。
-                      さらにメイン画面にある「メイン画面を閉じたら表示」をオンにすることで、親画面を閉じた際に、疲労状態や稼働率を常時把握できるコンパクトなミニ画面（ウィジェット）をデスクトップ上に自動表示できます。
+                      疲労状態が <strong>Critical（限界）</strong>に達したときは、休憩を促す警告アラートが画面上に通知されます。
+                      さらにメイン画面にある「メイン画面を閉じたら表示」をオンにすることで、親画面を閉じた際にコンパクトなミニ画面（ウィジェット）を表示できます。
+                    </p>
+
+                    <h3>5. ポモドーロモード</h3>
+                    <p>
+                      従来の自動疲労検知に加えて、一定時間ごとに作業と休憩を繰り返す<strong>「ポモドーロモード（15分/25分/50分）」</strong>を選択可能です。
+                    </p>
+                    <p>
+                      ポモドーロモード中はタイマーが表示され、<strong>「スタート」「一時停止」「リセット」</strong>ボタンで自分のペースに合わせてコントロールできます。フェーズ（作業/休憩）が切り替わると、デスクトップ通知とポップアップで知らせてくれます。
+                    </p>
+                    <p style={{ fontSize: '0.8rem', marginTop: '0.5rem', color: 'var(--text-muted)' }}>
+                      ※ポモドーロモード中は背景での複雑な稼働率計算をスキップし、PCの負荷を抑える最適化が行われます。
                     </p>
                   </div>
                 </section>
@@ -1393,7 +1636,11 @@ function App() {
                     </div>
                     <div className="tip-item">
                       <h5>ミニ画面（ウィジェット）</h5>
-                      <p>メインウィンドウの非表示中も、邪魔にならないウィジェットによって作業の集中度がひと目で確認できます。いつでもワンクリックでメイン画面に戻れます。</p>
+                      <p>メインウィンドウの非表示中も、邪魔にならないウィジェットによって作業の集中度がひと目で確認できます。</p>
+                    </div>
+                    <div className="tip-item">
+                      <h5>ポモドーロでの集中</h5>
+                      <p>作業に行き詰まったら、ポモドーロモードに切り替えてみましょう。強制的に休憩時間を設けることで、長時間の集中力を維持しやすくなります。</p>
                     </div>
                   </div>
                 </section>
@@ -1442,7 +1689,7 @@ function App() {
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
               <Activity size={15} color={fatigueData.statusName === 'Critical' ? '#ef4444' : fatigueData.statusName === 'Strained' ? '#f97316' : '#10b981'} />
-              <span style={{ fontSize: '0.75rem', fontWeight: '700', color: 'var(--mini-text-heading)' }}>疲労ゲージ</span>
+              <span style={{ fontSize: '0.75rem', fontWeight: '700', color: 'var(--mini-text-heading)' }}>トラッキング</span>
             </div>
           </div>
           <div style={{ display: 'flex', gap: '0.3rem', WebkitAppRegion: 'no-drag' }}>
@@ -1472,11 +1719,17 @@ function App() {
         <div style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem' }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.1rem', flex: 1, minWidth: 0 }}>
-              <span style={{ fontSize: '1.25rem', fontWeight: '800', color: fatigueData.statusName === 'Critical' ? '#ef4444' : fatigueData.statusName === 'Strained' ? '#f97316' : 'var(--mini-text-heading)', lineHeight: 1.1 }}>
-                {fatigueData.statusName === 'Initializing' ? 'Initializing . . .' : fatigueData.statusName}
+              <span style={{ fontSize: '1.15rem', fontWeight: '800', color: fatigueData.pomodoro ? (fatigueData.pomodoro.phase === 'work' ? 'var(--primary)' : '#10b981') : (fatigueData.statusName === 'Critical' ? '#ef4444' : fatigueData.statusName === 'Strained' ? '#f97316' : 'var(--mini-text-heading)'), lineHeight: 1.1 }}>
+                {fatigueData.pomodoro ? (fatigueData.pomodoro.phase === 'work' ? 'WORKING' : 'BREAK') : (fatigueData.statusName === 'Initializing' ? 'Initializing . . .' : fatigueData.statusName)}
               </span>
-              <span style={{ fontSize: '0.7rem', color: 'var(--mini-text-sub)' }}>
-                ({fatigueData.statusName === 'Initializing' ? '集計中. . .' : `${100 - fatigueData.idleRate}%`})
+              <span style={{ fontSize: '0.95rem', color: 'var(--mini-text-sub)' }}>
+                {fatigueData.pomodoro ? (
+                  <span style={{ fontWeight: '700', color: 'var(--mini-text-heading)' }}>
+                    残り {Math.floor((localRemainingSeconds ?? fatigueData.pomodoro.remainingSeconds) / 60)}:{((localRemainingSeconds ?? fatigueData.pomodoro.remainingSeconds) % 60).toString().padStart(2, '0')}
+                  </span>
+                ) : (
+                  `(${fatigueData.statusName === 'Initializing' ? '集計中. . .' : `${100 - fatigueData.idleRate}%`})`
+                )}
               </span>
             </div>
             <div style={{
@@ -1489,24 +1742,28 @@ function App() {
               visibility: settings.show_pet_in_mini === 'true' && fatigueData.statusName !== 'Initializing' ? 'visible' : 'hidden',
               marginRight: '25px'
             }}>
-              <PetIcon status={fatigueData.statusName} />
+              <PetIcon status={fatigueData.pomodoro ? (fatigueData.pomodoro.phase === 'work' ? 'Focused' : 'Restored') : fatigueData.statusName} />
             </div>
           </div>
 
           <div style={{ height: '5px', background: 'var(--mini-bar-bg)', borderRadius: '2.5px', overflow: 'hidden' }}>
             <div style={{
               height: '100%',
-              width: fatigueData.statusName === 'Initializing' ? 0 : `${100 - fatigueData.idleRate}%`,
-              background: fatigueData.statusName === 'Critical' ? 'linear-gradient(90deg, #ef4444, #f87171)' : fatigueData.statusName === 'Strained' ? 'linear-gradient(90deg, #f97316, #fb923c)' : 'linear-gradient(90deg, #10b981, #34d399)',
+              width: fatigueData.pomodoro
+                ? `${Math.max(0, Math.min(100, (((fatigueData.pomodoro.phase === 'work' ? fatigueData.pomodoro.workMin : fatigueData.pomodoro.breakMin) * 60 - (localRemainingSeconds ?? fatigueData.pomodoro.remainingSeconds)) / ((fatigueData.pomodoro.phase === 'work' ? fatigueData.pomodoro.workMin : fatigueData.pomodoro.breakMin) * 60)) * 100))}%`
+                : (fatigueData.statusName === 'Initializing' ? 0 : `${100 - fatigueData.idleRate}%`),
+              background: fatigueData.pomodoro
+                ? (fatigueData.pomodoro.phase === 'work' ? 'linear-gradient(90deg, var(--primary), var(--accent))' : 'linear-gradient(90deg, #10b981, #34d399)')
+                : (fatigueData.statusName === 'Critical' ? 'linear-gradient(90deg, #ef4444, #f87171)' : fatigueData.statusName === 'Strained' ? 'linear-gradient(90deg, #f97316, #fb923c)' : 'linear-gradient(90deg, #10b981, #34d399)'),
               borderRadius: '2.5px',
-              transition: 'width 0.5s ease'
+              transition: 'width 1s linear'
             }} />
           </div>
         </div>
 
         <div style={{
           fontSize: '0.65rem',
-          color: fatigueData.statusName === 'Critical' ? '#f87171' : fatigueData.statusName === 'Strained' ? '#fb923c' : '#34d399',
+          color: fatigueData.pomodoro ? (fatigueData.pomodoro.phase === 'work' ? 'var(--primary)' : '#34d399') : (fatigueData.statusName === 'Critical' ? '#f87171' : fatigueData.statusName === 'Strained' ? '#fb923c' : '#34d399'),
           background: fatigueData.statusName === 'Critical' ? 'rgba(239, 68, 68, 0.1)' : fatigueData.statusName === 'Strained' ? 'rgba(249, 115, 22, 0.1)' : 'rgba(16, 185, 129, 0.1)',
           border: fatigueData.statusName === 'Critical' ? '1px solid rgba(239, 68, 68, 0.2)' : fatigueData.statusName === 'Strained' ? '1px solid rgba(249, 115, 22, 0.2)' : '1px solid rgba(16, 185, 129, 0.2)',
           padding: '0.25rem 0.4rem',
@@ -1515,7 +1772,7 @@ function App() {
           fontWeight: '500',
           whiteSpace: 'pre-line'
         }}>
-          {getFatigueAdvice(fatigueData.statusName)}
+          {getFatigueAdvice(fatigueData.statusName, fatigueData.pomodoro, localRemainingSeconds)}
         </div>
 
         <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem', borderTop: '1px solid var(--mini-divider)', paddingTop: '0.35rem', WebkitAppRegion: 'no-drag' }}>
@@ -1549,12 +1806,12 @@ function App() {
               <span>ペットを表示</span>
             </label>
           </div>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <span style={{ fontSize: '0.65rem', color: 'var(--mini-text-dim)' }}>
-                稼働: {Math.floor(fatigueData.activeLogs * 10 / 60)}分
-              </span>
-              <StatusDots isRecording={isRecording} idleSeconds={idleSeconds} />
-            </div>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <span style={{ fontSize: '0.65rem', color: 'var(--mini-text-dim)' }}>
+              稼働: {Math.floor(fatigueData.activeLogs * 10 / 60)}分
+            </span>
+            <StatusDots isRecording={isRecording} idleSeconds={idleSeconds} />
+          </div>
         </div>
       </div >
     );
