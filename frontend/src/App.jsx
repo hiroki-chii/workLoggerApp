@@ -337,7 +337,7 @@ function App() {
         }
 
         const now = Date.now();
-        if (!window.location.search.includes('mini=true') && fData.statusName === 'Critical') {
+        if (!window.location.search.includes('mini=true') && fData.statusName === 'Critical' && settingsData.enable_fatigue_alert === 'true') {
           if (prevStatusRef.current !== 'Critical') {
             const message = `長時間の作業お疲れ様です。そろそろ休憩を取りませんか？`;
 
@@ -903,6 +903,27 @@ function App() {
                         <option value="pomodoro25">ポモドーロ２５</option>
                         <option value="pomodoro50">ポモドーロ５０</option>
                       </select>
+                      <button
+                        onClick={async () => {
+                          if (window.require) {
+                            const { ipcRenderer } = window.require('electron');
+                            await ipcRenderer.invoke('mini-window:open');
+                          }
+                        }}
+                        style={{
+                          padding: '0.3rem 0.6rem',
+                          fontSize: '0.75rem',
+                          borderRadius: '6px',
+                          background: 'rgba(99, 102, 241, 0.1)',
+                          border: '1px solid rgba(99, 102, 241, 0.2)',
+                          color: 'var(--primary)',
+                          cursor: 'pointer',
+                          fontWeight: '600',
+                          whiteSpace: 'nowrap'
+                        }}
+                      >
+                        ミニ画面を表示
+                      </button>
                     </div>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
                       <StatusDots isRecording={isRecording} idleSeconds={idleSeconds} />
@@ -923,26 +944,17 @@ function App() {
                           />
                           <span>メイン画面を閉じたら表示</span>
                         </label>
-                        <button
-                          onClick={async () => {
-                            if (window.require) {
-                              const { ipcRenderer } = window.require('electron');
-                              await ipcRenderer.invoke('mini-window:open');
-                            }
-                          }}
-                          style={{
-                            padding: '0.3rem 0.6rem',
-                            fontSize: '0.75rem',
-                            borderRadius: '6px',
-                            background: 'rgba(99, 102, 241, 0.1)',
-                            border: '1px solid rgba(99, 102, 241, 0.2)',
-                            color: 'var(--primary)',
-                            cursor: 'pointer',
-                            fontWeight: '600'
-                          }}
-                        >
-                          ミニ画面を表示
-                        </button>
+                        {fatigueData.currentMode === 'tracking' && (
+                          <label style={{ display: 'flex', alignItems: 'center', gap: '0.25rem', fontSize: '0.75rem', color: '#94a3b8', cursor: 'pointer' }}>
+                            <input
+                              type="checkbox"
+                              checked={settings.enable_fatigue_alert === 'true'}
+                              onChange={(e) => handleSaveSetting('enable_fatigue_alert', e.target.checked ? 'true' : 'false')}
+                              style={{ width: '12px', height: '12px', accentColor: '#6366f1' }}
+                            />
+                            <span>疲労アラート</span>
+                          </label>
+                        )}
                       </div>
                     </div>
                   </div>
@@ -990,9 +1002,11 @@ function App() {
                           </div>
                         </div>
                       ) : (
-                        <span style={{ fontSize: '0.85rem', color: '#94a3b8' }}>
-                          (稼働率 {fatigueData.statusName === 'Initializing' ? '集計中. . .' : `${100 - fatigueData.idleRate}%`})
-                        </span>
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
+                          <span style={{ fontSize: '0.85rem', color: '#94a3b8' }}>
+                            (稼働率 {fatigueData.statusName === 'Initializing' ? '集計中. . .' : `${100 - fatigueData.idleRate}%`})
+                          </span>
+                        </div>
                       )}
                     </div>
 

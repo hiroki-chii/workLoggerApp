@@ -70,6 +70,7 @@ try {
   db.prepare('INSERT OR IGNORE INTO settings (key, value) VALUES (?, ?)').run('mini_window_position', '右下');
   db.prepare('INSERT OR IGNORE INTO settings (key, value) VALUES (?, ?)').run('show_pet_in_mini', 'true');
   db.prepare('INSERT OR IGNORE INTO settings (key, value) VALUES (?, ?)').run('current_mode', 'tracking');
+  db.prepare('INSERT OR IGNORE INTO settings (key, value) VALUES (?, ?)').run('enable_fatigue_alert', 'true');
   db.prepare('INSERT OR IGNORE INTO settings (key, value) VALUES (?, ?)').run('pomodoro_start_ms', Date.now().toString());
   db.prepare('INSERT OR IGNORE INTO settings (key, value) VALUES (?, ?)').run('pomodoro_status', 'running');
   db.prepare('INSERT OR IGNORE INTO settings (key, value) VALUES (?, ?)').run('pomodoro_remaining_ms', '0');
