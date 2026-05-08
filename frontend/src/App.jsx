@@ -1216,69 +1216,7 @@ function App() {
                   <Settings size={20} /> アプリケーション設定
                 </div>
                 <div style={{ padding: '1.5rem' }}>
-                  {/* 稼働モード設定セクション */}
-                  <div style={{ marginBottom: '2rem', padding: '1.5rem', background: 'rgba(255,255,255,0.02)', borderRadius: '16px' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '1.5rem' }}>
-                      <Activity size={20} color="#10b981" />
-                      <div>
-                        <div style={{ fontWeight: '600' }}>稼働モード</div>
-                        <div style={{ fontSize: '0.8rem', color: '#94a3b8' }}>休憩を促す基準を選択します。</div>
-                      </div>
-                    </div>
-                    <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap' }}>
-                      {[
-                        { id: 'tracking', name: 'トラッキング' },
-                        { id: 'pomodoro15', name: 'ポモドーロ１５' },
-                        { id: 'pomodoro25', name: 'ポモドーロ２５' },
-                        { id: 'pomodoro50', name: 'ポモドーロ５０' }
-                      ].map(mode => (
-                        <button
-                          key={mode.id}
-                          onClick={() => handleModeChange(mode.id)}
-                          style={{
-                            padding: '0.75rem 1.25rem',
-                            borderRadius: '12px',
-                            background: fatigueData.currentMode === mode.id ? 'var(--primary)' : 'rgba(255,255,255,0.05)',
-                            color: fatigueData.currentMode === mode.id ? '#fff' : 'var(--text)',
-                            border: fatigueData.currentMode === mode.id ? 'none' : '1px solid rgba(255,255,255,0.1)',
-                            cursor: 'pointer',
-                            fontWeight: '600',
-                            fontSize: '0.9rem',
-                            transition: 'all 0.2s',
-                            boxShadow: fatigueData.currentMode === mode.id ? '0 4px 12px rgba(99, 102, 241, 0.3)' : 'none'
-                          }}
-                        >
-                          {mode.name}
-                        </button>
-                      ))}
-                    </div>
-                    {fatigueData.pomodoro && (
-                      <div style={{ marginTop: '1.5rem', display: 'flex', gap: '0.75rem', alignItems: 'center' }}>
-                        <div style={{ fontSize: '0.85rem', color: '#94a3b8', marginRight: '0.5rem' }}>ポモドーロ操作:</div>
-                        {fatigueData.pomodoro.status === 'paused' ? (
-                          <button
-                            onClick={() => handlePomodoroControl('start')}
-                            style={{ padding: '0.5rem 1rem', borderRadius: '8px', background: 'var(--primary)', color: 'white', border: 'none', cursor: 'pointer', fontSize: '0.85rem', fontWeight: '600' }}
-                          >
-                            スタート
-                          </button>
-                        ) : (
-                          <button
-                            onClick={() => handlePomodoroControl('pause')}
-                            style={{ padding: '0.5rem 1rem', borderRadius: '8px', background: 'rgba(255,255,255,0.05)', color: 'var(--text)', border: '1px solid rgba(255,255,255,0.1)', cursor: 'pointer', fontSize: '0.85rem', fontWeight: '600' }}
-                          >
-                            一時停止
-                          </button>
-                        )}
-                        <button
-                          onClick={() => handlePomodoroControl('reset')}
-                          style={{ padding: '0.5rem 1rem', borderRadius: '8px', background: 'rgba(255,255,255,0.05)', color: 'var(--text)', border: '1px solid rgba(255,255,255,0.1)', cursor: 'pointer', fontSize: '0.85rem', fontWeight: '600' }}
-                        >
-                          リセット
-                        </button>
-                      </div>
-                    )}
-                  </div>
+
 
 
 
@@ -1719,7 +1657,9 @@ function App() {
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
               <Activity size={15} color={fatigueData.statusName === 'Critical' ? '#ef4444' : fatigueData.statusName === 'Strained' ? '#f97316' : '#10b981'} />
-              <span style={{ fontSize: '0.75rem', fontWeight: '700', color: 'var(--mini-text-heading)' }}>トラッキング</span>
+              <span style={{ fontSize: '0.75rem', fontWeight: '700', color: 'var(--mini-text-heading)' }}>
+                {fatigueData.pomodoro ? 'ポモドーロ' : 'トラッキング'}
+              </span>
             </div>
           </div>
           <div style={{ display: 'flex', gap: '0.3rem', WebkitAppRegion: 'no-drag' }}>
