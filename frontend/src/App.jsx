@@ -36,6 +36,15 @@ import {
 } from 'chart.js';
 import { Pie } from 'react-chartjs-2';
 import { useTheme } from './ThemeProvider';
+import {
+  getStatusColor,
+  getStatusTextColor,
+  getStatusTheme,
+  calcProgressWidth,
+  calcProgressGradient,
+  invokeIpc,
+  formatRemainingTime
+} from './utils/helpers';
 
 ChartJS.register(ArcElement, Tooltip, Legend);
 
@@ -250,7 +259,6 @@ function App() {
   const [breakdownGroupBy, setBreakdownGroupBy] = useState('windowTitle'); // 'appName', 'windowTitle'
   const lastPomodoroPhaseRef = useRef(null);
   const [localRemainingSeconds, setLocalRemainingSeconds] = useState(null);
-  const lastSyncTimeRef = useRef(null);
 
   // ポモドーロの1秒刻みカウントダウン
   useEffect(() => {
@@ -277,14 +285,13 @@ function App() {
           ? `${fatigueData.pomodoro.workMin}分間の集中タイムです。頑張りましょう！`
           : `${fatigueData.pomodoro.breakMin}分間の休憩です。リラックスしてください。`;
 
-        if (window.require) {
-          const { ipcRenderer } = window.require('electron');
-          ipcRenderer.invoke('alert:danger', `${title}\n\n${message}`);
-        } else if (typeof window !== 'undefined' && window.Notification) {
-          new window.Notification("WorkPulse からのお知らせ", {
-            body: `${title} ${message}`
-          });
-        }
+        invokeIpc('alert:danger', `${title}\n\n${message}`).then(result => {
+          if (result === null && window.Notification) {
+            new window.Notification("WorkPulse からのお知らせ", {
+              body: `${title} ${message}`
+            });
+          }
+        });
       }
       lastPomodoroPhaseRef.current = fatigueData.pomodoro.phase;
     } else if (!fatigueData.pomodoro) {
@@ -338,15 +345,11 @@ function App() {
           setLocalRemainingSeconds(null);
         }
 
-        const now = Date.now();
         if (!window.location.search.includes('mini=true') && fData.statusName === 'Critical' && settingsData.enable_fatigue_alert === 'true') {
           if (prevStatusRef.current !== 'Critical') {
             const message = `長時間の作業お疲れ様です。そろそろ休憩を取りませんか？`;
-
-            if (window.require) {
-              const { ipcRenderer } = window.require('electron');
-              ipcRenderer.invoke('alert:danger', message);
-            } else if (typeof window !== 'undefined' && window.Notification) {
+            const result = await invokeIpc('alert:danger', message);
+            if (result === null && window.Notification) {
               new window.Notification("WorkPulse からのお知らせ", {
                 body: message
               });
@@ -355,7 +358,6 @@ function App() {
         }
         prevStatusRef.current = fData.statusName;
       }
-
 
       setWindowRules(rulesData);
 
@@ -445,24 +447,19 @@ function App() {
   };
 
   const checkRecordingStatus = async () => {
-    if (window.require) {
-      try {
-        const { ipcRenderer } = window.require('electron');
-        const status = await ipcRenderer.invoke('recording:status');
-        setIsRecording(status);
-      } catch (err) {
-        console.error('記録状態の取得に失敗しました:', err);
-      }
+    try {
+      const status = await invokeIpc('recording:status');
+      if (status !== null) setIsRecording(status);
+    } catch (err) {
+      console.error('記録状態の取得に失敗しました:', err);
     }
   };
 
   const toggleRecording = async () => {
-    if (window.require) {
-      const { ipcRenderer } = window.require('electron');
-      const channel = isRecording ? 'recording:stop' : 'recording:start';
-      const status = await ipcRenderer.invoke(channel);
+    const channel = isRecording ? 'recording:stop' : 'recording:start';
+    const status = await invokeIpc(channel);
+    if (status !== null) {
       setIsRecording(status);
-
       // 記録開始時はデータを即時リフレッシュ
       if (status) {
         setTimeout(fetchData, 1000);
@@ -485,16 +482,13 @@ function App() {
     if (newMode.startsWith('pomodoro') && fatigueData.currentMode === 'tracking' && fatigueData.statusName === 'Critical') {
       const message = "現在、疲労状態が『Critical』です。\nポモドーロモードで作業を再開する前に、まずは十分な休憩を取ることを強くお勧めします。\nこのまま切り替えますか？";
 
-      if (window.require) {
-        const { ipcRenderer } = window.require('electron');
-        const confirmed = await ipcRenderer.invoke('alert:confirm', {
-          title: '休憩のおすすめ',
-          message
-        });
-        if (!confirmed) return;
-      } else {
-        if (!window.confirm(message)) return;
-      }
+      const confirmed = await invokeIpc('alert:confirm', {
+        title: '休憩のおすすめ',
+        message
+      });
+      // Electron環境: confirmed が false なら中断 / ブラウザ環境: window.confirm にフォールバック
+      if (confirmed === false) return;
+      if (confirmed === null && !window.confirm(message)) return;
     }
 
     try {
@@ -884,7 +878,7 @@ function App() {
                 <div className="card" style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
                   <div className="card-title" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.5rem', marginBottom: 0 }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                      <Activity size={20} color={fatigueData.statusName === 'Critical' ? '#ef4444' : fatigueData.statusName === 'Strained' ? '#f97316' : '#10b981'} />
+                      <Activity size={20} color={getStatusColor(fatigueData.statusName)} />
                       <select
                         value={fatigueData.currentMode}
                         onChange={(e) => handleModeChange(e.target.value)}
@@ -906,12 +900,7 @@ function App() {
                         <option value="pomodoro50">ポモドーロ５０</option>
                       </select>
                       <button
-                        onClick={async () => {
-                          if (window.require) {
-                            const { ipcRenderer } = window.require('electron');
-                            await ipcRenderer.invoke('mini-window:open');
-                          }
-                        }}
+                        onClick={() => invokeIpc('mini-window:open')}
                         style={{
                           padding: '0.3rem 0.6rem',
                           fontSize: '0.75rem',
@@ -937,10 +926,7 @@ function App() {
                             onChange={async (e) => {
                               const val = e.target.checked ? 'true' : 'false';
                               handleSaveSetting('show_mini_on_close', val);
-                              if (val === 'false' && window.require) {
-                                const { ipcRenderer } = window.require('electron');
-                                await ipcRenderer.invoke('mini-window:close');
-                              }
+                              if (val === 'false') await invokeIpc('mini-window:close');
                             }}
                             style={{ width: '12px', height: '12px', accentColor: '#6366f1' }}
                           />
@@ -1020,12 +1006,8 @@ function App() {
                     <div style={{ height: '8px', background: 'rgba(255, 255, 255, 0.05)', borderRadius: '4px', overflow: 'hidden' }}>
                       <div style={{
                         height: '100%',
-                        width: fatigueData.pomodoro
-                          ? `${Math.max(0, Math.min(100, (((fatigueData.pomodoro.phase === 'work' ? fatigueData.pomodoro.workMin : fatigueData.pomodoro.breakMin) * 60 - (localRemainingSeconds ?? fatigueData.pomodoro.remainingSeconds)) / ((fatigueData.pomodoro.phase === 'work' ? fatigueData.pomodoro.workMin : fatigueData.pomodoro.breakMin) * 60)) * 100))}%`
-                          : (fatigueData.statusName === 'Initializing' ? 0 : `${100 - fatigueData.idleRate}%`),
-                        background: fatigueData.pomodoro
-                          ? (fatigueData.pomodoro.phase === 'work' ? 'linear-gradient(90deg, var(--primary), var(--accent))' : 'linear-gradient(90deg, #10b981, #34d399)')
-                          : (fatigueData.statusName === 'Critical' ? 'linear-gradient(90deg, #ef4444, #f87171)' : fatigueData.statusName === 'Strained' ? 'linear-gradient(90deg, #f97316, #fb923c)' : 'linear-gradient(90deg, #10b981, #34d399)'),
+                        width: calcProgressWidth(fatigueData, localRemainingSeconds),
+                        background: calcProgressGradient(fatigueData),
                         borderRadius: '4px',
                         transition: 'width 1s linear'
                       }} />
@@ -1055,10 +1037,10 @@ function App() {
                     {!fatigueData.pomodoro && (
                       <div style={{
                         padding: '0.65rem 0.85rem',
-                        background: fatigueData.statusName === 'Critical' ? 'rgba(239, 68, 68, 0.1)' : fatigueData.statusName === 'Strained' ? 'rgba(249, 115, 22, 0.1)' : 'rgba(16, 185, 129, 0.1)',
-                        border: fatigueData.statusName === 'Critical' ? '1px solid rgba(239, 68, 68, 0.2)' : fatigueData.statusName === 'Strained' ? '1px solid rgba(249, 115, 22, 0.2)' : '1px solid rgba(16, 185, 129, 0.2)',
+                        background: getStatusTheme(fatigueData.statusName).bg,
+                        border: getStatusTheme(fatigueData.statusName).border,
                         borderRadius: '12px',
-                        color: fatigueData.statusName === 'Critical' ? '#f87171' : fatigueData.statusName === 'Strained' ? '#fb923c' : '#34d399',
+                        color: getStatusTextColor(fatigueData.statusName),
                         fontSize: '0.85rem',
                         fontWeight: '600',
                         lineHeight: '1.4',
@@ -1665,7 +1647,7 @@ function App() {
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
-              <Activity size={15} color={fatigueData.statusName === 'Critical' ? '#ef4444' : fatigueData.statusName === 'Strained' ? '#f97316' : '#10b981'} />
+              <Activity size={15} color={getStatusColor(fatigueData.statusName)} />
               <span style={{ fontSize: '0.75rem', fontWeight: '700', color: 'var(--mini-text-heading)' }}>
                 {fatigueData.pomodoro ? 'ポモドーロ' : 'トラッキング'}
               </span>
@@ -1673,12 +1655,7 @@ function App() {
           </div>
           <div style={{ display: 'flex', gap: '0.3rem', WebkitAppRegion: 'no-drag' }}>
             <button
-              onClick={async () => {
-                if (window.require) {
-                  const { ipcRenderer } = window.require('electron');
-                  await ipcRenderer.invoke('mini-window:close');
-                }
-              }}
+              onClick={() => invokeIpc('mini-window:close')}
               style={{
                 background: 'var(--mini-btn-bg)',
                 border: '1px solid var(--mini-btn-border)',
@@ -1728,12 +1705,8 @@ function App() {
           <div style={{ height: '5px', background: 'var(--mini-bar-bg)', borderRadius: '2.5px', overflow: 'hidden' }}>
             <div style={{
               height: '100%',
-              width: fatigueData.pomodoro
-                ? `${Math.max(0, Math.min(100, (((fatigueData.pomodoro.phase === 'work' ? fatigueData.pomodoro.workMin : fatigueData.pomodoro.breakMin) * 60 - (localRemainingSeconds ?? fatigueData.pomodoro.remainingSeconds)) / ((fatigueData.pomodoro.phase === 'work' ? fatigueData.pomodoro.workMin : fatigueData.pomodoro.breakMin) * 60)) * 100))}%`
-                : (fatigueData.statusName === 'Initializing' ? 0 : `${100 - fatigueData.idleRate}%`),
-              background: fatigueData.pomodoro
-                ? (fatigueData.pomodoro.phase === 'work' ? 'linear-gradient(90deg, var(--primary), var(--accent))' : 'linear-gradient(90deg, #10b981, #34d399)')
-                : (fatigueData.statusName === 'Critical' ? 'linear-gradient(90deg, #ef4444, #f87171)' : fatigueData.statusName === 'Strained' ? 'linear-gradient(90deg, #f97316, #fb923c)' : 'linear-gradient(90deg, #10b981, #34d399)'),
+              width: calcProgressWidth(fatigueData, localRemainingSeconds),
+              background: calcProgressGradient(fatigueData),
               borderRadius: '2.5px',
               transition: 'width 1s linear'
             }} />
@@ -1794,9 +1767,9 @@ function App() {
         ) : (
           <div style={{
             fontSize: '0.65rem',
-            color: fatigueData.statusName === 'Critical' ? '#f87171' : fatigueData.statusName === 'Strained' ? '#fb923c' : '#34d399',
-            background: fatigueData.statusName === 'Critical' ? 'rgba(239, 68, 68, 0.1)' : fatigueData.statusName === 'Strained' ? 'rgba(249, 115, 22, 0.1)' : 'rgba(16, 185, 129, 0.1)',
-            border: fatigueData.statusName === 'Critical' ? '1px solid rgba(239, 68, 68, 0.2)' : fatigueData.statusName === 'Strained' ? '1px solid rgba(249, 115, 22, 0.2)' : '1px solid rgba(16, 185, 129, 0.2)',
+            color: getStatusTextColor(fatigueData.statusName),
+            background: getStatusTheme(fatigueData.statusName).bg,
+            border: getStatusTheme(fatigueData.statusName).border,
             padding: '0.25rem 0.4rem',
             borderRadius: '6px',
             lineHeight: '1.25',
@@ -1816,10 +1789,7 @@ function App() {
                 onChange={async (e) => {
                   const val = e.target.checked ? 'true' : 'false';
                   handleSaveSetting('show_mini_on_close', val);
-                  if (val === 'false' && window.require) {
-                    const { ipcRenderer } = window.require('electron');
-                    await ipcRenderer.invoke('mini-window:close');
-                  }
+                  if (val === 'false') await invokeIpc('mini-window:close');
                 }}
                 style={{ width: '12px', height: '12px', accentColor: '#6366f1' }}
               />
@@ -1976,10 +1946,7 @@ function App() {
               <button
                 onClick={async () => {
                   if (window.confirm('アプリケーションを完全に終了しますか？\n（バックグラウンドでの記録も停止します）')) {
-                    if (window.require) {
-                      const { ipcRenderer } = window.require('electron');
-                      await ipcRenderer.invoke('app:quit-completely');
-                    }
+                    await invokeIpc('app:quit-completely');
                   }
                 }}
                 style={{

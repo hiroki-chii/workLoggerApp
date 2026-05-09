@@ -998,3 +998,43 @@
 
 ## $now - 操作ボタンの折り返し防止設定
 - **frontend/src/App.jsx**: メイン画面のポモドーロ操作ボタンにおいて、ウィンドウサイズが小さい場合でもボタン内のテキスト（アイコン含む）が改行されないよう white-space: nowrap を適用。
+
+## $now - �R�[�h�̃��t�@�N�^�����O�ƃR���|�[�l���g����
+
+- **frontend/src/utils/helpers.js**: ���[�e�B���e�B�֐��i���Ԍv�Z�A���[���K�p�A��J�x�A�h�o�C�X���j��ʃt�@�C���ɒ��o�B
+- **frontend/src/hooks/useWorkData.js**: �f�[�^�擾�A�|�[�����O�A��ԊǗ����W�b�N���J�X�^���t�b�N�ɏW��BApp.jsx�̃��W�b�N��啝�Ɋȑf���B
+- **frontend/src/components/**: UI���@�\���ƂɃR���|�[�l���g���B
+  - **PetIcon.jsx**: �y�b�g�̕`�惍�W�b�N�𕪗��B
+  - **Sidebar.jsx**: �T�C�h�o�[�ƃi�r�Q�[�V�����𕪗��B
+  - **DashboardView.jsx**: ���C���̍�Ɠ��v�ƃ|���h�[��/��J�\���𕪗��B
+  - **TimetableView.jsx**: 24���ԃA�N�e�B�r�e�B�O���b�h�𕪗��B
+  - **HistoryView.jsx**: �����ꗗ�e�[�u���𕪗��B
+  - **SettingsView.jsx**: �A�v���ݒ�ƒu�����[���Ǘ��𕪗��B
+  - **HelpView.jsx**: �w���v�h�L�������g�𕪗��B
+  - **MiniWindow.jsx**: �~�j��ʁi�E�B�W�F�b�g�j��UI��Ɨ������R���|�[�l���g�Ƃ��Ē��o�B
+- **frontend/src/App.jsx**: ����ȒP��R���|�[�l���g����̂��A�e�r���[�ƃt�b�N��g�ݍ��킹��\���ɍ��V�B�R�[�h�s�����2200�s�����400�s�֍팸�i��80%�̍팸�j�B
+
+## $now - �o�b�N�G���h�̃R�[�h�����ƕs��C��
+
+- **backend/server.js**: 
+  - ��J�x�v�Z���W�b�N�ɂ����āA�T���v�����O�Ԋu�� 11 �Ƀn�[�h�R�[�h����Ă����ӏ����C�����A�ݒ�l�i�f�t�H���g 10�j�𐳂����Q�Ƃ���悤�ɕύX�B
+  - �ݒ�l�̎擾������ getAllSettings �w���p�[�֐��ɒ��o���A�R�[�h�̏d�����폜�B
+
+## 2026-05-09 17:52 - App.jsx リファクタリング（重複コード排除）
+
+### 新規ファイル
+- **frontend/src/utils/helpers.js**: App.jsx内の重複ロジックを共通ヘルパー関数として抽出。
+  - getStatusColor() / getStatusTextColor() / getStatusTheme(): ステータス名に応じた色・テーマを返す共通関数（6箇所以上の重複を解消）
+  - calcProgressWidth() / calcProgressGradient(): プログレスバーの幅・グラデーション計算（ダッシュボードとミニウィンドウで完全重複していたロジックを統一）
+  - invokeIpc(): Electron IPC呼び出しのラッパー（8箇所以上の if (window.require) { ... } パターンを1行に簡素化）
+  - ormatRemainingTime(): ポモドーロ残り時間のフォーマット
+  - mergeAndSortStats(): statsデータのマージ・ソート共通処理
+
+### App.jsx の変更
+- **IPC呼び出しパターンの統一**: window.require のガード付きIPC呼び出し8箇所をすべて invokeIpc() ヘルパーに置き換え
+- **プログレスバー計算の共通化**: ダッシュボードとミニウィンドウで重複していた複雑なインライン計算を calcProgressWidth() / calcProgressGradient() に集約
+- **ステータス色判定の共通化**: 6箇所以上の三項演算子チェーンを getStatusColor() / getStatusTextColor() / getStatusTheme() に置き換え
+- **未使用変数の削除**: lastSyncTimeRef（宣言のみで未使用）、
+ow（未使用のDate.now()）を削除
+- **useEffect内のasyncエラー修正**: useEffectコールバック内でのawait使用を.then()チェーンに修正
+- 行数: 2194行 → 2160行（34行削減、可読性は大幅向上）
