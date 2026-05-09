@@ -4,6 +4,7 @@ const Database = require('better-sqlite3');
 const path = require('path');
 const fs = require('fs');
 const { stringify } = require('csv-stringify');
+const { GoogleGenerativeAI } = require('@google/generative-ai');
 
 const app = express();
 const PORT = 3001;
@@ -232,7 +233,7 @@ app.get('/api/fatigue', (req, res) => {
     if (currentMode && currentMode.startsWith('pomodoro')) {
       const workMin = parseInt(currentMode.replace('pomodoro', ''));
       const breakMin = workMin === 15 ? 3 : (workMin === 25 ? 5 : 10);
-      
+
       const pomodoroStatus = db.prepare('SELECT value FROM settings WHERE key = ?').get('pomodoro_status').value || 'running';
       const pomodoroPausedRemaining = parseInt(db.prepare('SELECT value FROM settings WHERE key = ?').get('pomodoro_remaining_ms').value || '0');
 
@@ -505,6 +506,109 @@ app.get('/api/heatmap', (req, res) => {
     res.json(data);
   } catch (err) {
     console.error('[Server] Heatmap error:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Gemini APIs
+app.post('/api/settings/verify-gemini', async (req, res) => {
+  try {
+    const { apiKey } = req.body;
+    if (!apiKey) {
+      return res.status(400).json({ success: false, error: 'API Key is required' });
+    }
+    const genAI = new GoogleGenerativeAI(apiKey);
+    const model = genAI.getGenerativeModel({ model: 'gemini-3.1-flash-lite' }); // Use requested model
+    const result = await model.generateContent('Hello');
+    if (result && result.response) {
+      res.json({ success: true });
+    } else {
+      res.json({ success: false, error: 'Invalid response from API' });
+    }
+  } catch (err) {
+    console.error('[Server] Gemini verify error:', err);
+    res.json({ success: false, error: err.message });
+  }
+});
+
+let cachedPetMessage = '';
+let cachedPetMessageTime = 0;
+
+app.get('/api/pet-message', async (req, res) => {
+  try {
+    const now = Date.now();
+    // 20秒以内のリクエストならキャッシュを返す（メイン画面とミニ画面の同期用）
+    if (cachedPetMessage && (now - cachedPetMessageTime < 20000)) {
+      return res.json({ message: cachedPetMessage });
+    }
+
+    const apiKeyRow = db.prepare("SELECT value FROM settings WHERE key = 'gemini_api_key'").get();
+    const apiKey = apiKeyRow ? apiKeyRow.value : null;
+
+    if (!apiKey) {
+      return res.status(400).json({ error: 'API Key not configured' });
+    }
+
+    const genAI = new GoogleGenerativeAI(apiKey);
+    const model = genAI.getGenerativeModel({ model: 'gemini-3.1-flash-lite' }); // requested model
+
+    // 直近5分のログを取得
+    const recentLogs = db.prepare("SELECT appName, windowTitle FROM logs WHERE timestamp >= datetime('now', '-5 minutes', 'localtime') ORDER BY timestamp DESC LIMIT 20").all();
+
+    const settingsRows = db.prepare('SELECT * FROM settings').all();
+    const settings = settingsRows.reduce((acc, curr) => ({ ...acc, [curr.key]: curr.value }), {});
+    const currentMode = settings.current_mode || 'tracking';
+
+    let logsText = recentLogs.map(l => `[${l.appName}] ${l.windowTitle}`).join('\n');
+    if (!logsText) logsText = '直近の作業記録はありません';
+
+    const statusName = req.query.statusName || 'Unknown';
+    const petTone = settings.pet_tone || 'friendly';
+    const petToneCustom = settings.pet_tone_custom || '';
+    const userNickname = settings.user_nickname || 'ユーザー';
+
+    let toneInstruction = 'フレンドリーで親しみやすい口調（〜だよ、〜だね！）で話してください。';
+    if (petTone === 'polite') {
+      toneInstruction = '敬語を使い、丁寧で温かみのある口調で話してください。';
+    } else if (petTone === 'gyaru') {
+      toneInstruction = 'ギャル語（〜だょ、まじ、超、ウケる等）を使い、テンション高めで話してください。絵文字も適度に使ってください。';
+    } else if (petTone === 'otaku') {
+      toneInstruction = 'ネットスラングやオタク特有の早口な口調（〜氏、〜ですぞ、〜草、など）で話してください。AAも適度に使ってください。';
+    } else if (petTone === 'tsundere') {
+      toneInstruction = 'ツンデレな口調（「べ、別にあんたのためじゃないんだからね！」「ちょっとは休んだら？」など）で話してください。';
+    } else if (petTone === 'stoic') {
+      toneInstruction = '無駄のない、厳しくストイックなコーチ的な口調（〜しろ。〜だ。等）で話してください。';
+    } else if (petTone === 'original') {
+      toneInstruction = `以下のカスタムルールに従って話してください：\n${petToneCustom}`;
+    }
+
+    const prompt = `
+あなたはPC作業を見守る小さなペットキャラクターです。
+ユーザー（${userNickname}）の直近の作業ログ、現在のモード、そして現在の「疲労状態」を見て、1〜2文で短く励ましやアドバイスの言葉をかけてください。
+疲労状態がCriticalやStrainedの場合は休むように促し、それ以外の場合は作業内容に合わせた応援をしてください。
+
+【重要なルール】
+作業履歴のウィンドウ名（内容）を参照して、ユーザーが今何をしているか（例: プログラミング、動画視聴、ブラウジング、資料作成など）を把握してください。
+ただし、具体的なアプリ名やウィンドウ名（例: "chrome", "YouTube", "VSCode", "〇〇.txt"など）は絶対に発言に含めないでください。「ブラウザで調べ物」「コードを書いてる」「作業」のように抽象化して伝えてください。
+
+${toneInstruction}
+マークダウンや記号は控えめにし、プレーンなテキストでお願いします。最大でも50文字程度にしてください。
+
+【現在のモード】: ${currentMode}
+【現在の疲労状態】: ${statusName}
+【直近の作業ログ（一部）】:
+${logsText}
+`;
+
+    const result = await model.generateContent(prompt);
+    const text = result.response.text();
+
+    cachedPetMessage = text.trim();
+    cachedPetMessageTime = now;
+
+    res.json({ message: cachedPetMessage });
+  } catch (err) {
+    console.error('[Server] Pet message error:', err);
     res.status(500).json({ error: err.message });
   }
 });

@@ -249,6 +249,93 @@ function App() {
   const lastPomodoroPhaseRef = useRef(null);
   const [localRemainingSeconds, setLocalRemainingSeconds] = useState(null);
   const lastSyncTimeRef = useRef(null);
+  const fatigueDataRef = useRef(fatigueData);
+
+  useEffect(() => {
+    fatigueDataRef.current = fatigueData;
+  }, [fatigueData]);
+
+  const [petMessage, setPetMessage] = useState('');
+  const [apiKeyInput, setApiKeyInput] = useState('');
+  const [isVerifyingApiKey, setIsVerifyingApiKey] = useState(false);
+  const [apiKeyStatus, setApiKeyStatus] = useState(null); // { success: boolean, message: string }
+
+  // 1分ごとにペットメッセージを取得
+  useEffect(() => {
+    if (!settings.gemini_api_key) return;
+    
+    const fetchPetMessage = async () => {
+      try {
+        const status = fatigueDataRef.current?.statusName || 'Unknown';
+        const res = await fetch(`${API_BASE}/pet-message?statusName=${encodeURIComponent(status)}`);
+        if (res.ok) {
+          const data = await res.json();
+          if (data.message) {
+            setPetMessage(data.message);
+          } else {
+            setPetMessage('');
+          }
+        } else {
+          setPetMessage('');
+        }
+      } catch (err) {
+        console.error('Failed to fetch pet message:', err);
+        setPetMessage('');
+      }
+    };
+
+    fetchPetMessage();
+    const interval = setInterval(fetchPetMessage, 30000); // 30秒ごと
+    return () => clearInterval(interval);
+  }, [settings.gemini_api_key]);
+
+  const translateGeminiError = (errorStr) => {
+    if (!errorStr) return '原因不明のエラーが発生しました。';
+    if (errorStr.includes('API_KEY_INVALID') || errorStr.includes('key not valid')) {
+      return 'APIキーが無効です。正しいキーを入力してください。';
+    }
+    if (errorStr.includes('QUOTA_EXCEEDED')) {
+      return 'APIの利用制限（クォータ）を超えました。しばらく時間をおいてから試してください。';
+    }
+    if (errorStr.includes('MODEL_NOT_FOUND')) {
+      return '指定されたAIモデルが見つかりません。';
+    }
+    if (errorStr.includes('SAFETY')) {
+      return '安全性の制限により回答を生成できませんでした。';
+    }
+    return `エラーが発生しました: ${errorStr}`;
+  };
+
+  const handleVerifyGeminiKey = async () => {
+    if (!apiKeyInput) return;
+    setIsVerifyingApiKey(true);
+    setApiKeyStatus(null);
+    try {
+      const res = await fetch(`${API_BASE}/settings/verify-gemini`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ apiKey: apiKeyInput })
+      });
+      const data = await res.json();
+      if (data.success) {
+        setApiKeyStatus({ success: true, message: 'APIキーは有効です！保存されました。' });
+        handleSaveSetting('gemini_api_key', apiKeyInput);
+      } else {
+        setApiKeyStatus({ success: false, message: translateGeminiError(data.error) });
+      }
+    } catch (err) {
+      setApiKeyStatus({ success: false, message: 'APIへの接続に失敗しました。' });
+    }
+    setIsVerifyingApiKey(false);
+  };
+
+  const handleResetGeminiKey = () => {
+    handleSaveSetting('gemini_api_key', '');
+    setApiKeyInput('');
+    setApiKeyStatus({ success: true, message: 'APIキーをリセットし、従来のメッセージに戻りました。' });
+    setPetMessage('');
+  };
+
 
   // ポモドーロの1秒刻みカウントダウン
   useEffect(() => {
@@ -432,6 +519,7 @@ function App() {
       setLogs(processedLogs);
       setHeatmapData(processedHeatmap);
       setSettings(settingsData);
+      setApiKeyInput(settingsData.gemini_api_key || '');
       setWindowTitles(Array.isArray(titlesData) ? titlesData : []);
       setError(null);
       setLoading(false);
@@ -1047,16 +1135,17 @@ function App() {
 
                     <div style={{
                       padding: '0.65rem 0.85rem',
-                      background: fatigueData.statusName === 'Critical' ? 'rgba(239, 68, 68, 0.1)' : fatigueData.statusName === 'Strained' ? 'rgba(249, 115, 22, 0.1)' : 'rgba(16, 185, 129, 0.1)',
-                      border: fatigueData.statusName === 'Critical' ? '1px solid rgba(239, 68, 68, 0.2)' : fatigueData.statusName === 'Strained' ? '1px solid rgba(249, 115, 22, 0.2)' : '1px solid rgba(16, 185, 129, 0.2)',
+                      background: petMessage ? 'linear-gradient(135deg, rgba(245, 158, 11, 0.1), rgba(217, 119, 6, 0.15))' : fatigueData.statusName === 'Critical' ? 'rgba(239, 68, 68, 0.1)' : fatigueData.statusName === 'Strained' ? 'rgba(249, 115, 22, 0.1)' : 'rgba(16, 185, 129, 0.1)',
+                      border: petMessage ? '1px solid rgba(245, 158, 11, 0.3)' : fatigueData.statusName === 'Critical' ? '1px solid rgba(239, 68, 68, 0.2)' : fatigueData.statusName === 'Strained' ? '1px solid rgba(249, 115, 22, 0.2)' : '1px solid rgba(16, 185, 129, 0.2)',
                       borderRadius: '12px',
-                      color: fatigueData.statusName === 'Critical' ? '#f87171' : fatigueData.statusName === 'Strained' ? '#fb923c' : '#34d399',
+                      color: petMessage ? '#fbbf24' : fatigueData.statusName === 'Critical' ? '#f87171' : fatigueData.statusName === 'Strained' ? '#fb923c' : '#34d399',
                       fontSize: '0.85rem',
                       fontWeight: '600',
                       lineHeight: '1.4',
-                      whiteSpace: 'pre-line'
+                      whiteSpace: 'pre-line',
+                      boxShadow: petMessage ? '0 0 10px rgba(245, 158, 11, 0.1)' : 'none'
                     }}>
-                      {getFatigueAdvice(fatigueData.statusName, fatigueData.pomodoro, localRemainingSeconds)}
+                      {petMessage || getFatigueAdvice(fatigueData.statusName, fatigueData.pomodoro, localRemainingSeconds)}
                     </div>
                   </div>
                 </div>
@@ -1216,9 +1305,6 @@ function App() {
                   <Settings size={20} /> アプリケーション設定
                 </div>
                 <div style={{ padding: '1.5rem' }}>
-
-
-
 
                   {/* 表示名置換ルール設定セクション */}
                   <div style={{ marginBottom: '2rem', padding: '1.5rem', background: 'rgba(255,255,255,0.02)', borderRadius: '16px' }}>
@@ -1426,6 +1512,87 @@ function App() {
                     </div>
                   </div>
 
+
+
+                  {/* Gemini API 設定セクション */}
+                  <div style={{ marginBottom: '2rem', padding: '1.5rem', background: 'rgba(255,255,255,0.02)', borderRadius: '16px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '1.5rem' }}>
+                      <Settings size={20} color="#10b981" />
+                      <div>
+                        <div style={{ fontWeight: '600' }}>AI ペット連携 (Gemini API)</div>
+                        <div style={{ fontSize: '0.8rem', color: '#94a3b8' }}>Gemini APIキーを入力すると、作業記録に応じてペットが励ましの言葉をかけてくれます。</div>
+                      </div>
+                    </div>
+                    
+                    <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+                      <input
+                        type="password"
+                        placeholder="Gemini API Key"
+                        value={apiKeyInput}
+                        onChange={(e) => setApiKeyInput(e.target.value)}
+                        style={{ flex: 1, padding: '0.5rem', borderRadius: '6px', border: '1px solid rgba(255,255,255,0.1)', background: 'rgba(0,0,0,0.2)', color: 'var(--text)' }}
+                      />
+                      <button
+                        onClick={handleVerifyGeminiKey}
+                        disabled={isVerifyingApiKey || !apiKeyInput}
+                        style={{ padding: '0.5rem 1rem', borderRadius: '6px', background: isVerifyingApiKey || !apiKeyInput ? '#64748b' : 'var(--primary)', color: '#fff', border: 'none', cursor: isVerifyingApiKey || !apiKeyInput ? 'not-allowed' : 'pointer', fontWeight: '500' }}
+                      >
+                        {isVerifyingApiKey ? '確認中...' : '確認して保存'}
+                      </button>
+                      <button
+                        onClick={handleResetGeminiKey}
+                        style={{ padding: '0.5rem 1rem', borderRadius: '6px', background: 'rgba(239, 68, 68, 0.1)', color: '#ef4444', border: '1px solid rgba(239, 68, 68, 0.2)', cursor: 'pointer', fontWeight: '500' }}
+                      >
+                        リセット
+                      </button>
+                    </div>
+                    {apiKeyStatus && (
+                      <div style={{ marginTop: '0.5rem', fontSize: '0.85rem', color: apiKeyStatus.success ? '#10b981' : '#f87171' }}>
+                        {apiKeyStatus.message}
+                      </div>
+                    )}
+
+                    <div style={{ marginTop: '1.5rem', borderTop: '1px solid rgba(255,255,255,0.1)', paddingTop: '1.5rem' }}>
+                      <div style={{ fontWeight: '600', marginBottom: '0.5rem' }}>二人称（あなたの呼ばれ方）</div>
+                      <input
+                        type="text"
+                        defaultValue={settings.user_nickname || ''}
+                        onBlur={(e) => handleSaveSetting('user_nickname', e.target.value)}
+                        placeholder="例: ユーザー名、ご主人様、先輩"
+                        style={{ width: '100%', padding: '0.5rem', borderRadius: '6px', border: '1px solid rgba(255,255,255,0.1)', background: 'rgba(0,0,0,0.2)', color: 'var(--text)' }}
+                      />
+                    </div>
+
+                    <div style={{ marginTop: '1.5rem', borderTop: '1px solid rgba(255,255,255,0.1)', paddingTop: '1.5rem' }}>
+                      <div style={{ fontWeight: '600', marginBottom: '0.5rem' }}>ペットの口調</div>
+                      <select
+                        value={settings.pet_tone || 'friendly'}
+                        onChange={(e) => handleSaveSetting('pet_tone', e.target.value)}
+                        style={{ width: '100%', padding: '0.5rem', borderRadius: '6px', border: '1px solid rgba(255,255,255,0.1)', background: 'rgba(0,0,0,0.2)', color: 'var(--text)', marginBottom: '1rem' }}
+                      >
+                        <option value="friendly">フレンドリー</option>
+                        <option value="polite">丁寧</option>
+                        <option value="gyaru">ギャル語</option>
+                        <option value="otaku">オタク</option>
+                        <option value="tsundere">ツンデレ</option>
+                        <option value="stoic">ストイック</option>
+                        <option value="original">オリジナル</option>
+                      </select>
+
+                      {settings.pet_tone === 'original' && (
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                          <div style={{ fontSize: '0.8rem', color: '#94a3b8' }}>オリジナルのルールや口調を指示してください：</div>
+                          <textarea
+                            defaultValue={settings.pet_tone_custom || ''}
+                            onBlur={(e) => handleSaveSetting('pet_tone_custom', e.target.value)}
+                            rows={3}
+                            placeholder="例: 関西弁で話して。語尾は「やで」にして。"
+                            style={{ width: '100%', padding: '0.5rem', borderRadius: '6px', border: '1px solid rgba(255,255,255,0.1)', background: 'rgba(0,0,0,0.2)', color: 'var(--text)', resize: 'vertical' }}
+                          />
+                        </div>
+                      )}
+                    </div>
+                  </div>
 
                   <div style={{ marginBottom: '2rem', padding: '1.5rem', background: 'rgba(239, 68, 68, 0.05)', border: '1px solid rgba(239, 68, 68, 0.1)', borderRadius: '16px' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '1rem', color: '#f87171' }}>
@@ -1733,16 +1900,17 @@ function App() {
 
         <div style={{
           fontSize: '0.65rem',
-          color: fatigueData.pomodoro ? (fatigueData.pomodoro.phase === 'work' ? 'var(--primary)' : '#34d399') : (fatigueData.statusName === 'Critical' ? '#f87171' : fatigueData.statusName === 'Strained' ? '#fb923c' : '#34d399'),
-          background: fatigueData.statusName === 'Critical' ? 'rgba(239, 68, 68, 0.1)' : fatigueData.statusName === 'Strained' ? 'rgba(249, 115, 22, 0.1)' : 'rgba(16, 185, 129, 0.1)',
-          border: fatigueData.statusName === 'Critical' ? '1px solid rgba(239, 68, 68, 0.2)' : fatigueData.statusName === 'Strained' ? '1px solid rgba(249, 115, 22, 0.2)' : '1px solid rgba(16, 185, 129, 0.2)',
+          color: petMessage ? '#fbbf24' : fatigueData.pomodoro ? (fatigueData.pomodoro.phase === 'work' ? 'var(--primary)' : '#34d399') : (fatigueData.statusName === 'Critical' ? '#f87171' : fatigueData.statusName === 'Strained' ? '#fb923c' : '#34d399'),
+          background: petMessage ? 'linear-gradient(135deg, rgba(245, 158, 11, 0.1), rgba(217, 119, 6, 0.15))' : fatigueData.statusName === 'Critical' ? 'rgba(239, 68, 68, 0.1)' : fatigueData.statusName === 'Strained' ? 'rgba(249, 115, 22, 0.1)' : 'rgba(16, 185, 129, 0.1)',
+          border: petMessage ? '1px solid rgba(245, 158, 11, 0.3)' : fatigueData.statusName === 'Critical' ? '1px solid rgba(239, 68, 68, 0.2)' : fatigueData.statusName === 'Strained' ? '1px solid rgba(249, 115, 22, 0.2)' : '1px solid rgba(16, 185, 129, 0.2)',
           padding: '0.25rem 0.4rem',
           borderRadius: '6px',
           lineHeight: '1.25',
           fontWeight: '500',
-          whiteSpace: 'pre-line'
+          whiteSpace: 'pre-line',
+          boxShadow: petMessage ? '0 0 5px rgba(245, 158, 11, 0.1)' : 'none'
         }}>
-          {getFatigueAdvice(fatigueData.statusName, fatigueData.pomodoro, localRemainingSeconds)}
+          {petMessage || getFatigueAdvice(fatigueData.statusName, fatigueData.pomodoro, localRemainingSeconds)}
         </div>
 
         <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem', borderTop: '1px solid var(--mini-divider)', paddingTop: '0.35rem', WebkitAppRegion: 'no-drag' }}>
