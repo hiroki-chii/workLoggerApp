@@ -1053,7 +1053,7 @@ function App() {
                       <span style={{ fontSize: '2rem', fontWeight: '800', color: fatigueData.pomodoro ? (fatigueData.pomodoro.phase === 'work' ? 'var(--primary)' : '#10b981') : (fatigueData.statusName === 'Critical' ? '#ef4444' : fatigueData.statusName === 'Strained' ? '#f97316' : 'var(--text)'), lineHeight: 1 }}>
                         {fatigueData.pomodoro ? (fatigueData.pomodoro.phase === 'work' ? 'WORKING' : 'BREAK') : (fatigueData.statusName === 'Initializing' ? 'Initializing . . .' : fatigueData.statusName)}
                       </span>
-                      <div style={{ visibility: fatigueData.statusName === 'Initializing' ? 'hidden' : 'visible' }}>
+                      <div style={{ visibility: (!fatigueData.pomodoro && fatigueData.statusName !== 'Initializing') ? 'visible' : 'hidden' }}>
                         <PetIcon status={fatigueData.pomodoro ? (fatigueData.pomodoro.phase === 'work' ? 'Focused' : 'Restored') : fatigueData.statusName} size={48} />
                       </div>
                     </div>
@@ -1133,20 +1133,22 @@ function App() {
                       </div>
                     </div>
 
-                    <div style={{
-                      padding: '0.65rem 0.85rem',
-                      background: petMessage ? 'linear-gradient(135deg, rgba(245, 158, 11, 0.1), rgba(217, 119, 6, 0.15))' : fatigueData.statusName === 'Critical' ? 'rgba(239, 68, 68, 0.1)' : fatigueData.statusName === 'Strained' ? 'rgba(249, 115, 22, 0.1)' : 'rgba(16, 185, 129, 0.1)',
-                      border: petMessage ? '1px solid rgba(245, 158, 11, 0.3)' : fatigueData.statusName === 'Critical' ? '1px solid rgba(239, 68, 68, 0.2)' : fatigueData.statusName === 'Strained' ? '1px solid rgba(249, 115, 22, 0.2)' : '1px solid rgba(16, 185, 129, 0.2)',
-                      borderRadius: '12px',
-                      color: petMessage ? '#fbbf24' : fatigueData.statusName === 'Critical' ? '#f87171' : fatigueData.statusName === 'Strained' ? '#fb923c' : '#34d399',
-                      fontSize: '0.85rem',
-                      fontWeight: '600',
-                      lineHeight: '1.4',
-                      whiteSpace: 'pre-line',
-                      boxShadow: petMessage ? '0 0 10px rgba(245, 158, 11, 0.1)' : 'none'
-                    }}>
-                      {petMessage || getFatigueAdvice(fatigueData.statusName, fatigueData.pomodoro, localRemainingSeconds)}
-                    </div>
+                    {!fatigueData.pomodoro && (
+                      <div style={{
+                        padding: '0.65rem 0.85rem',
+                        background: petMessage ? 'linear-gradient(135deg, rgba(245, 158, 11, 0.1), rgba(217, 119, 6, 0.15))' : fatigueData.statusName === 'Critical' ? 'rgba(239, 68, 68, 0.1)' : fatigueData.statusName === 'Strained' ? 'rgba(249, 115, 22, 0.1)' : 'rgba(16, 185, 129, 0.1)',
+                        border: petMessage ? '1px solid rgba(245, 158, 11, 0.3)' : fatigueData.statusName === 'Critical' ? '1px solid rgba(239, 68, 68, 0.2)' : fatigueData.statusName === 'Strained' ? '1px solid rgba(249, 115, 22, 0.2)' : '1px solid rgba(16, 185, 129, 0.2)',
+                        borderRadius: '12px',
+                        color: petMessage ? '#fbbf24' : fatigueData.statusName === 'Critical' ? '#f87171' : fatigueData.statusName === 'Strained' ? '#fb923c' : '#34d399',
+                        fontSize: '0.85rem',
+                        fontWeight: '600',
+                        lineHeight: '1.4',
+                        whiteSpace: 'pre-line',
+                        boxShadow: petMessage ? '0 0 10px rgba(245, 158, 11, 0.1)' : 'none'
+                      }}>
+                        {petMessage || getFatigueAdvice(fatigueData.statusName, fatigueData.pomodoro, localRemainingSeconds)}
+                      </div>
+                    )}
                   </div>
                 </div>
               </section>
@@ -1876,7 +1878,7 @@ function App() {
               alignItems: 'center',
               justifyContent: 'center',
               flexShrink: 0,
-              visibility: settings.show_pet_in_mini === 'true' && fatigueData.statusName !== 'Initializing' ? 'visible' : 'hidden',
+              visibility: !fatigueData.pomodoro && settings.show_pet_in_mini === 'true' && fatigueData.statusName !== 'Initializing' ? 'visible' : 'hidden',
               marginRight: '25px'
             }}>
               <PetIcon status={fatigueData.pomodoro ? (fatigueData.pomodoro.phase === 'work' ? 'Focused' : 'Restored') : fatigueData.statusName} />
@@ -1898,20 +1900,48 @@ function App() {
           </div>
         </div>
 
-        <div style={{
-          fontSize: '0.65rem',
-          color: petMessage ? '#fbbf24' : fatigueData.pomodoro ? (fatigueData.pomodoro.phase === 'work' ? 'var(--primary)' : '#34d399') : (fatigueData.statusName === 'Critical' ? '#f87171' : fatigueData.statusName === 'Strained' ? '#fb923c' : '#34d399'),
-          background: petMessage ? 'linear-gradient(135deg, rgba(245, 158, 11, 0.1), rgba(217, 119, 6, 0.15))' : fatigueData.statusName === 'Critical' ? 'rgba(239, 68, 68, 0.1)' : fatigueData.statusName === 'Strained' ? 'rgba(249, 115, 22, 0.1)' : 'rgba(16, 185, 129, 0.1)',
-          border: petMessage ? '1px solid rgba(245, 158, 11, 0.3)' : fatigueData.statusName === 'Critical' ? '1px solid rgba(239, 68, 68, 0.2)' : fatigueData.statusName === 'Strained' ? '1px solid rgba(249, 115, 22, 0.2)' : '1px solid rgba(16, 185, 129, 0.2)',
-          padding: '0.25rem 0.4rem',
-          borderRadius: '6px',
-          lineHeight: '1.25',
-          fontWeight: '500',
-          whiteSpace: 'pre-line',
-          boxShadow: petMessage ? '0 0 5px rgba(245, 158, 11, 0.1)' : 'none'
-        }}>
-          {petMessage || getFatigueAdvice(fatigueData.statusName, fatigueData.pomodoro, localRemainingSeconds)}
-        </div>
+        {!fatigueData.pomodoro && (
+          <div style={{
+            fontSize: '0.65rem',
+            color: petMessage ? '#fbbf24' : fatigueData.pomodoro ? (fatigueData.pomodoro.phase === 'work' ? 'var(--primary)' : '#34d399') : (fatigueData.statusName === 'Critical' ? '#f87171' : fatigueData.statusName === 'Strained' ? '#fb923c' : '#34d399'),
+            background: petMessage ? 'linear-gradient(135deg, rgba(245, 158, 11, 0.1), rgba(217, 119, 6, 0.15))' : fatigueData.statusName === 'Critical' ? 'rgba(239, 68, 68, 0.1)' : fatigueData.statusName === 'Strained' ? 'rgba(249, 115, 22, 0.1)' : 'rgba(16, 185, 129, 0.1)',
+            border: petMessage ? '1px solid rgba(245, 158, 11, 0.3)' : fatigueData.statusName === 'Critical' ? '1px solid rgba(239, 68, 68, 0.2)' : fatigueData.statusName === 'Strained' ? '1px solid rgba(249, 115, 22, 0.2)' : '1px solid rgba(16, 185, 129, 0.2)',
+            padding: '0.25rem 0.4rem',
+            borderRadius: '6px',
+            lineHeight: '1.25',
+            fontWeight: '500',
+            whiteSpace: 'pre-line',
+            boxShadow: petMessage ? '0 0 5px rgba(245, 158, 11, 0.1)' : 'none'
+          }}>
+            {petMessage || getFatigueAdvice(fatigueData.statusName, fatigueData.pomodoro, localRemainingSeconds)}
+          </div>
+        )}
+
+        {fatigueData.pomodoro && (
+          <div style={{ display: 'flex', gap: '0.3rem', WebkitAppRegion: 'no-drag' }}>
+            {fatigueData.pomodoro.status === 'paused' ? (
+              <button
+                onClick={() => handlePomodoroControl('start')}
+                style={{ flex: 1, padding: '0.35rem 0', fontSize: '0.75rem', background: 'var(--primary)', color: 'white', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: '700' }}
+              >
+                スタート
+              </button>
+            ) : (
+              <button
+                onClick={() => handlePomodoroControl('pause')}
+                style={{ flex: 1, padding: '0.35rem 0', fontSize: '0.75rem', background: 'rgba(255,255,255,0.1)', color: 'var(--mini-text-heading)', border: '1px solid var(--mini-btn-border)', borderRadius: '8px', cursor: 'pointer', fontWeight: '700' }}
+              >
+                一時停止
+              </button>
+            )}
+            <button
+              onClick={() => handlePomodoroControl('reset')}
+              style={{ flex: 1, padding: '0.35rem 0', fontSize: '0.75rem', background: 'rgba(255,255,255,0.1)', color: 'var(--mini-text-heading)', border: '1px solid var(--mini-btn-border)', borderRadius: '8px', cursor: 'pointer', fontWeight: '700' }}
+            >
+              リセット
+            </button>
+          </div>
+        )}
 
         <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem', borderTop: '1px solid var(--mini-divider)', paddingTop: '0.35rem', WebkitAppRegion: 'no-drag' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -1931,18 +1961,20 @@ function App() {
               />
               <span>メイン画面を閉じたら表示</span>
             </label>
-            <label style={{ display: 'flex', alignItems: 'center', gap: '0.25rem', fontSize: '0.65rem', color: 'var(--mini-text-sub)', cursor: 'pointer' }}>
-              <input
-                type="checkbox"
-                checked={settings.show_pet_in_mini === 'true'}
-                onChange={async (e) => {
-                  const val = e.target.checked ? 'true' : 'false';
-                  handleSaveSetting('show_pet_in_mini', val);
-                }}
-                style={{ width: '12px', height: '12px', accentColor: '#6366f1' }}
-              />
-              <span>ペットを表示</span>
-            </label>
+            {!fatigueData.pomodoro && (
+              <label style={{ display: 'flex', alignItems: 'center', gap: '0.25rem', fontSize: '0.65rem', color: 'var(--mini-text-sub)', cursor: 'pointer' }}>
+                <input
+                  type="checkbox"
+                  checked={settings.show_pet_in_mini === 'true'}
+                  onChange={async (e) => {
+                    const val = e.target.checked ? 'true' : 'false';
+                    handleSaveSetting('show_pet_in_mini', val);
+                  }}
+                  style={{ width: '12px', height: '12px', accentColor: '#6366f1' }}
+                />
+                <span>ペットを表示</span>
+              </label>
+            )}
           </div>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <span style={{ fontSize: '0.65rem', color: 'var(--mini-text-dim)' }}>

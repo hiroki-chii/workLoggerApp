@@ -337,8 +337,8 @@ app.post('/api/pomodoro/control', (req, res) => {
       db.prepare('INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)').run('pomodoro_status', 'running');
     } else if (action === 'reset') {
       db.prepare('INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)').run('pomodoro_start_ms', Date.now().toString());
-      db.prepare('INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)').run('pomodoro_status', 'running');
-      db.prepare('INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)').run('pomodoro_remaining_ms', '0');
+      db.prepare('INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)').run('pomodoro_status', 'paused');
+      db.prepare('INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)').run('pomodoro_remaining_ms', workMinMs.toString());
     }
 
     res.json({ success: true });
