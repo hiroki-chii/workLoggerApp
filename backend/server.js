@@ -552,8 +552,8 @@ app.get('/api/pet-message', async (req, res) => {
     const genAI = new GoogleGenerativeAI(apiKey);
     const model = genAI.getGenerativeModel({ model: 'gemini-3.1-flash-lite' }); // requested model
 
-    // 直近5分のログを取得
-    const recentLogs = db.prepare("SELECT appName, windowTitle FROM logs WHERE timestamp >= datetime('now', '-5 minutes', 'localtime') ORDER BY timestamp DESC LIMIT 20").all();
+    // 直近60分のログを取得
+    const recentLogs = db.prepare("SELECT appName, windowTitle FROM logs WHERE timestamp >= datetime('now', '-60 minutes') ORDER BY timestamp DESC LIMIT 100").all();
 
     const settingsRows = db.prepare('SELECT * FROM settings').all();
     const settings = settingsRows.reduce((acc, curr) => ({ ...acc, [curr.key]: curr.value }), {});
