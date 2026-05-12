@@ -513,6 +513,6 @@ app.get('/api/heatmap', (req, res) => {
 });
 
 app.listen(PORT, '127.0.0.1', () => {
-  console.log(`[Server] WorkPulse API listening on http://127.0.0.1:${PORT}`);
+  console.log(`[Server] ゆとリズム API listening on http://127.0.0.1:${PORT}`);
 });
 

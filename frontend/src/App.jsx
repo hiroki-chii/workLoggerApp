@@ -4,7 +4,6 @@ import {
   History,
   Settings,
   Download,
-  Activity,
   Clock,
   Calendar,
   PieChart,
@@ -215,6 +214,39 @@ const PetIcon = ({ status, size = 40 }) => {
   );
 };
 
+const Logo = ({ size = 32, className = "" }) => {
+  return (
+    <svg 
+      width={size} 
+      height={size} 
+      viewBox="0 0 200 200" 
+      xmlns="http://www.w3.org/2000/svg"
+      className={className}
+      style={{ display: 'inline-block', verticalAlign: 'middle' }}
+    >
+      <defs>
+        <linearGradient id="logoGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+          <stop offset="0%" style={{ stopColor: '#81e6d9', stopOpacity: 1 }} />
+          <stop offset="100%" style={{ stopColor: '#63b3ed', stopOpacity: 1 }} />
+        </linearGradient>
+      </defs>
+      
+      <circle cx="100" cy="100" r="90" fill="url(#logoGrad)" opacity="0.1" />
+      <circle cx="100" cy="100" r="70" fill="url(#logoGrad)" />
+
+      <path 
+        d="M 50 120 C 70 120, 80 85, 100 85 C 120 85, 130 120, 150 120" 
+        stroke="white" 
+        strokeWidth="10" 
+        strokeLinecap="round" 
+        fill="transparent" 
+      />
+      
+      <circle cx="100" cy="65" r="6" fill="white" />
+    </svg>
+  );
+};
+
 function App() {
   const [stats, setStats] = useState([]);
   const [totalAppsCount, setTotalAppsCount] = useState(0);
@@ -287,7 +319,7 @@ function App() {
 
         invokeIpc('alert:danger', `${title}\n\n${message}`).then(result => {
           if (result === null && window.Notification) {
-            new window.Notification("WorkPulse からのお知らせ", {
+            new window.Notification("ゆとリズム からのお知らせ", {
               body: `${title} ${message}`
             });
           }
@@ -350,7 +382,7 @@ function App() {
             const message = `長時間の作業お疲れ様です。そろそろ休憩を取りませんか？`;
             const result = await invokeIpc('alert:danger', message);
             if (result === null && window.Notification) {
-              new window.Notification("WorkPulse からのお知らせ", {
+              new window.Notification("ゆとリズム からのお知らせ", {
                 body: message
               });
             }
@@ -878,7 +910,7 @@ function App() {
                 <div className="card" style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
                   <div className="card-title" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.5rem', marginBottom: 0 }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                      <Activity size={20} color={getStatusColor(fatigueData.statusName)} />
+                      <Logo size={20} />
                       <select
                         value={fatigueData.currentMode}
                         onChange={(e) => handleModeChange(e.target.value)}
@@ -938,7 +970,7 @@ function App() {
                               type="checkbox"
                               checked={settings.enable_fatigue_alert === 'true'}
                               onChange={(e) => handleSaveSetting('enable_fatigue_alert', e.target.checked ? 'true' : 'false')}
-                              style={{ width: '12px', height: '12px', accentColor: '#6366f1' }}
+                              style={{ width: '12px', height: '12px', accentColor: 'var(--primary)' }}
                             />
                             <span>疲労アラート</span>
                           </label>
@@ -1211,7 +1243,7 @@ function App() {
                   {/* スライディングウィンドウ設定セクション */}
                   <div style={{ marginBottom: '2rem', padding: '1.5rem', background: 'rgba(255,255,255,0.02)', borderRadius: '16px' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '1.5rem' }}>
-                      <Activity size={20} color="#10b981" />
+                      <Logo size={20} />
                       <div>
                         <div style={{ fontWeight: '600' }}>疲労状態の算出基準時間（スライディングウィンドウ）</div>
                         <div style={{ fontSize: '0.8rem', color: '#94a3b8' }}>リアルタイムの疲労状態を計算する際に、過去何分間の活動状況を基準にするかを選択します。</div>
@@ -1239,7 +1271,7 @@ function App() {
                   {/* 表示名置換ルール設定セクション */}
                   <div style={{ marginBottom: '2rem', padding: '1.5rem', background: 'rgba(255,255,255,0.02)', borderRadius: '16px' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '1.5rem' }}>
-                      <Settings size={20} color="#8b5cf6" />
+                      <Settings size={20} color="var(--primary)" />
                       <div>
                         <div style={{ fontWeight: '600' }}>表示名の変更ルール</div>
                         <div style={{ fontSize: '0.8rem', color: '#94a3b8' }}>特定のウィンドウ名を、分かりやすい名前に変更して表示します。</div>
@@ -1273,7 +1305,7 @@ function App() {
                       <input
                         type="color"
                         id="newRuleColor"
-                        defaultValue="#5c6ac4"
+                        defaultValue="#8b5cf6"
                         style={{ width: '38px', height: '38px', padding: '0.1rem', borderRadius: '6px', border: '1px solid rgba(255,255,255,0.1)', background: 'rgba(0,0,0,0.2)', cursor: 'pointer', flexShrink: 0 }}
                         title="表示色を選択"
                       />
@@ -1513,7 +1545,7 @@ function App() {
               <div className="help-grid">
                 <section className="card fade-in" style={{ animationDelay: '0.1s' }}>
                   <div className="card-title">
-                    <HelpCircle size={20} color="var(--primary)" /> WorkPulse の使い方
+                    <HelpCircle size={20} color="var(--primary)" /> ゆとリズム の使い方
                   </div>
                   <div className="help-content">
                     <h3>1. 自動記録</h3>
@@ -1608,7 +1640,7 @@ function App() {
 
                 <section className="card fade-in" style={{ animationDelay: '0.3s', gridColumn: '1 / -1' }}>
                   <div className="card-title">
-                    <Activity size={20} color="#10b981" /> 便利なヒント
+                    <Logo size={20} /> 便利なヒント
                   </div>
                   <div className="tips-grid">
                     <div className="tip-item">
@@ -1673,7 +1705,7 @@ function App() {
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
-              <Activity size={15} color={getStatusColor(fatigueData.statusName)} />
+              <Logo size={15} />
               <span style={{ fontSize: '0.75rem', fontWeight: '700', color: 'var(--mini-text-heading)' }}>
                 {fatigueData.pomodoro ? 'ポモドーロ' : 'トラッキング'}
               </span>
@@ -1701,7 +1733,7 @@ function App() {
         <div style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem' }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.1rem', flex: 1, minWidth: 0 }}>
-              <span style={{ fontSize: '1.15rem', fontWeight: '800', color: fatigueData.pomodoro ? (fatigueData.pomodoro.phase === 'work' ? 'var(--primary)' : '#10b981') : (fatigueData.statusName === 'Critical' ? '#ef4444' : fatigueData.statusName === 'Strained' ? '#f97316' : 'var(--mini-text-heading)'), lineHeight: 1.1 }}>
+              <span style={{ fontSize: '1.15rem', fontWeight: '800', color: fatigueData.pomodoro ? (fatigueData.pomodoro.phase === 'work' ? 'var(--primary)' : 'var(--accent)') : (fatigueData.statusName === 'Critical' ? 'var(--danger)' : fatigueData.statusName === 'Strained' ? 'var(--warning)' : 'var(--mini-text-heading)'), lineHeight: 1.1 }}>
                 {fatigueData.pomodoro ? (fatigueData.pomodoro.phase === 'work' ? 'WORKING' : 'BREAK') : (fatigueData.statusName === 'Initializing' ? 'Initializing . . .' : fatigueData.statusName)}
               </span>
               <span style={{ fontSize: '0.95rem', color: 'var(--mini-text-sub)' }}>
@@ -1817,7 +1849,7 @@ function App() {
                   handleSaveSetting('show_mini_on_close', val);
                   if (val === 'false') await invokeIpc('mini-window:close');
                 }}
-                style={{ width: '12px', height: '12px', accentColor: '#6366f1' }}
+                style={{ width: '12px', height: '12px', accentColor: 'var(--primary)' }}
               />
               <span>メイン画面を閉じたら表示</span>
             </label>
@@ -1830,7 +1862,7 @@ function App() {
                     const val = e.target.checked ? 'true' : 'false';
                     handleSaveSetting('show_pet_in_mini', val);
                   }}
-                  style={{ width: '12px', height: '12px', accentColor: '#6366f1' }}
+                style={{ width: '12px', height: '12px', accentColor: 'var(--primary)' }}
                 />
                 <span>ペットを表示</span>
               </label>
@@ -1853,10 +1885,10 @@ function App() {
         <div className="logo">
           {!isSidebarCollapsed && (
             <>
-              <Activity size={32} color="#6366f1" />
+              <Logo size={32} />
               <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  <span>WorkPulse</span>
+                  <span>ゆとリズム</span>
                 </div>
               </div>
             </>
@@ -2037,7 +2069,7 @@ function App() {
                   </div>
                 </div>
                 <button
-                  className="primary-btn mini"
+                  className="accent-btn mini"
                   onClick={(e) => {
                     e.stopPropagation();
                     handleExportCsv('range');
