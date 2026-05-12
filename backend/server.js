@@ -101,7 +101,7 @@ app.get('/api/stats', (req, res) => {
       query += ` WHERE date(timestamp, 'localtime') BETWEEN ? AND ? `;
       params.push(startDate, endDate);
     } else {
-      query += ` WHERE date(timestamp, 'localtime') = date('now', 'localtime') `;
+      query += ` WHERE date(timestamp, 'localtime', '-4 hours') = date('now', 'localtime', '-4 hours') `;
     }
 
     query += ` GROUP BY name ORDER BY count DESC `;
@@ -184,7 +184,7 @@ app.get('/api/fatigue', (req, res) => {
         MIN(timestamp) as startTime, 
         COUNT(*) as activeLogs 
       FROM logs 
-      WHERE date(timestamp, 'localtime') = date('now', 'localtime')
+      WHERE date(timestamp, 'localtime', '-4 hours') = date('now', 'localtime', '-4 hours')
     `).get();
 
     // 共通の稼働データ
@@ -212,8 +212,7 @@ app.get('/api/fatigue', (req, res) => {
       const windowActiveLogsObj = db.prepare(`
         SELECT COUNT(*) as activeLogsInWindow
         FROM logs
-        WHERE date(timestamp, 'localtime') = date('now', 'localtime')
-          AND timestamp >= datetime('now', '-${slidingWindowSize} minutes')
+        WHERE timestamp >= datetime('now', '-${slidingWindowSize} minutes')
       `).get();
 
       const activeLogsInWindow = windowActiveLogsObj ? windowActiveLogsObj.activeLogsInWindow : 0;
@@ -284,7 +283,7 @@ app.get('/api/fatigue', (req, res) => {
 
 app.post('/api/fatigue/reset', (req, res) => {
   try {
-    db.prepare("DELETE FROM logs WHERE date(timestamp, 'localtime') = date('now', 'localtime')").run();
+    db.prepare("DELETE FROM logs WHERE date(timestamp, 'localtime', '-4 hours') = date('now', 'localtime', '-4 hours')").run();
     res.json({ success: true });
   } catch (err) {
     console.error('[Server] Reset fatigue error:', err);
@@ -295,7 +294,7 @@ app.post('/api/fatigue/reset', (req, res) => {
 app.get('/api/debug-db', (req, res) => {
   try {
     const logs = db.prepare("SELECT timestamp FROM logs ORDER BY timestamp DESC LIMIT 20").all();
-    const matchCount = db.prepare("SELECT COUNT(*) as c FROM logs WHERE date(timestamp, 'localtime') = date('now', 'localtime')").get().c;
+    const matchCount = db.prepare("SELECT COUNT(*) as c FROM logs WHERE date(timestamp, 'localtime', '-4 hours') = date('now', 'localtime', '-4 hours')").get().c;
     res.json({ logs, matchCount });
   } catch (err) {
     res.json({ error: err.message });
@@ -475,7 +474,7 @@ app.get('/api/heatmap', (req, res) => {
       whereClause = ` WHERE date(timestamp, 'localtime') BETWEEN ? AND ? `;
       params.push(startDate, endDate);
     } else {
-      whereClause = ` WHERE date(timestamp, 'localtime') = date('now', 'localtime') `;
+      whereClause = ` WHERE date(timestamp, 'localtime', '-4 hours') = date('now', 'localtime', '-4 hours') `;
     }
 
     // 各(時間枠, アプリ, ウィンドウ)の組み合わせでカウントし、時間枠ごとに最大のものを抽出
