@@ -1208,8 +1208,33 @@ function App() {
                 </div>
                 <div style={{ padding: '1.5rem' }}>
 
-
-
+                  {/* スライディングウィンドウ設定セクション */}
+                  <div style={{ marginBottom: '2rem', padding: '1.5rem', background: 'rgba(255,255,255,0.02)', borderRadius: '16px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '1.5rem' }}>
+                      <Activity size={20} color="#10b981" />
+                      <div>
+                        <div style={{ fontWeight: '600' }}>疲労状態の算出基準時間（スライディングウィンドウ）</div>
+                        <div style={{ fontSize: '0.8rem', color: '#94a3b8' }}>リアルタイムの疲労状態を計算する際に、過去何分間の活動状況を基準にするかを選択します。</div>
+                      </div>
+                    </div>
+                    <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap' }}>
+                      <select 
+                        value={settings.sliding_window_size || '90'}
+                        onChange={(e) => handleSaveSetting('sliding_window_size', e.target.value)}
+                        style={{ padding: '0.5rem', borderRadius: '6px', border: '1px solid rgba(255,255,255,0.1)', background: 'rgba(0,0,0,0.2)', color: 'var(--text)', fontSize: '0.9rem', minWidth: '200px' }}
+                      >
+                        <option value="60">６０分（短期的な疲労に敏感）</option>
+                        <option value="90">９０分（標準的・おすすめ）</option>
+                        <option value="120">１２０分（長期的な疲労を重視）</option>
+                      </select>
+                    </div>
+                    <div style={{ marginTop: '1rem', fontSize: '0.8rem', color: '#94a3b8', background: 'rgba(0,0,0,0.2)', padding: '1rem', borderRadius: '8px', lineHeight: '1.5' }}>
+                      <strong style={{ color: 'var(--text-muted)' }}>選定基準：</strong><br />
+                      ・<strong style={{ color: 'var(--text)' }}>６０分</strong>: 短時間の集中作業や、すぐに休憩を取りたい方向け。疲労レベルの変動が早くなります。<br />
+                      ・<strong style={{ color: 'var(--text)' }}>９０分</strong>: 一般的な作業サイクルに適した標準設定。適度な間隔での休憩を促します。<br />
+                      ・<strong style={{ color: 'var(--text)' }}>１２０分</strong>: 長時間の継続的な作業を行う方向け。疲労レベルがゆっくりと上昇します。
+                    </div>
+                  </div>
 
                   {/* 表示名置換ルール設定セクション */}
                   <div style={{ marginBottom: '2rem', padding: '1.5rem', background: 'rgba(255,255,255,0.02)', borderRadius: '16px' }}>
@@ -1521,7 +1546,8 @@ function App() {
 
                     <h3>4. ミニ画面と疲労状態・稼働率</h3>
                     <p>
-                      <strong>90分スライディングウィンドウ方式</strong>に基づき、直近90分間の活動状況からリアルタイムに疲労状態（Restored / Calm / Focused / Strained / Critical）を自動算出します。
+                      <strong>スライディングウィンドウ方式</strong>に基づき、直近の活動状況（初期設定では過去90分）からリアルタイムに疲労状態（Restored / Calm / Focused / Strained / Critical）を自動算出します。
+                      ※算出基準となる時間（60分・90分・120分）は、設定画面から自由に変更できます。
                     </p>
                     <p>
                       疲労状態が <strong>Critical（限界）</strong>に達したときは、休憩を促す警告アラートが画面上に通知されます。

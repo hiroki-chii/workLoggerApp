@@ -74,6 +74,7 @@ try {
   db.prepare('INSERT OR IGNORE INTO settings (key, value) VALUES (?, ?)').run('pomodoro_start_ms', Date.now().toString());
   db.prepare('INSERT OR IGNORE INTO settings (key, value) VALUES (?, ?)').run('pomodoro_status', 'running');
   db.prepare('INSERT OR IGNORE INTO settings (key, value) VALUES (?, ?)').run('pomodoro_remaining_ms', '0');
+  db.prepare('INSERT OR IGNORE INTO settings (key, value) VALUES (?, ?)').run('sliding_window_size', '90');
   // 既存データがある場合は「右上」を「右下」へ補正
   db.prepare("UPDATE settings SET value = '右下' WHERE key = 'mini_window_position' AND value = '右上'").run();
   console.log('[Server] Database initialized (Better-SQLite3, WAL mode) at: %s', DB_PATH);
@@ -206,15 +207,17 @@ app.get('/api/fatigue', (req, res) => {
     let statusName = 'Initializing';
 
     if (currentMode === 'tracking' && activeLogs > 0) {
+      const slidingWindowSize = parseInt(settings.sliding_window_size || '90');
+      const slidingWindowSeconds = slidingWindowSize * 60;
       const windowActiveLogsObj = db.prepare(`
         SELECT COUNT(*) as activeLogsInWindow
         FROM logs
         WHERE date(timestamp, 'localtime') = date('now', 'localtime')
-          AND timestamp >= datetime('now', '-60 minutes')
+          AND timestamp >= datetime('now', '-${slidingWindowSize} minutes')
       `).get();
 
       const activeLogsInWindow = windowActiveLogsObj ? windowActiveLogsObj.activeLogsInWindow : 0;
-      const expectedLogsInWindow = Math.max(1, Math.floor(3600 / samplingInterval));
+      const expectedLogsInWindow = Math.max(1, Math.floor(slidingWindowSeconds / samplingInterval));
       idleRatePercent = Math.max(0, Math.min(100, Math.round(((expectedLogsInWindow - activeLogsInWindow) / expectedLogsInWindow) * 100)));
       fatigueLevel = Math.max(0, Math.min(100, 100 - idleRatePercent));
 
