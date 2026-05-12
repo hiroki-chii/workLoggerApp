@@ -1038,3 +1038,5 @@
 ow（未使用のDate.now()）を削除
 - **useEffect内のasyncエラー修正**: useEffectコールバック内でのawait使用を.then()チェーンに修正
 - 行数: 2194行 → 2160行（34行削減、可読性は大幅向上）
+## 2026-05-12 20:54 - README.mdの作�E
+- **README.md**: プロジェクト�E概要、機�E、技術スタチE��、セチE��アチE�E方法を記載したREADMEを作�E、E- **Assets**: README用のバナー画像！Eulsework_banner�E�を生�Eし追加、E
