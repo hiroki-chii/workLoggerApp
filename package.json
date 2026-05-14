@@ -31,7 +31,7 @@
   },
   "build": {
     "appId": "com.workloggerapp.app",
-    "productName": "PulseWork",
+    "productName": "ゆとリズム",
     "directories": {
       "output": "dist-pulse"
     },

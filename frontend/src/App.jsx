@@ -473,7 +473,7 @@ function App() {
       setLoading(false);
     } catch (err) {
       console.error('データの取得に失敗しました:', err);
-      setError('サーバーに接続できません。backendプロセスが起動しているか確認してください。');
+      setError('サーバーの準備が整うのを待っています。しばらくお待ちください...');
       setLoading(false);
     }
   };
@@ -851,16 +851,16 @@ function App() {
                 <div style={{
                   margin: '1rem 0',
                   padding: '1rem',
-                  background: 'rgba(239, 68, 68, 0.1)',
-                  border: '1px solid rgba(239, 68, 68, 0.2)',
+                  background: 'rgba(99, 102, 241, 0.1)',
+                  border: '1px solid rgba(99, 102, 241, 0.2)',
                   borderRadius: '12px',
-                  color: '#f87171',
+                  color: '#6366f1',
                   fontSize: '0.9rem',
                   display: 'flex',
                   alignItems: 'center',
                   gap: '0.5rem'
                 }}>
-                  <RefreshCw size={16} />
+                  <RefreshCw size={16} className="animate-spin" style={{ animation: 'spin 2s linear infinite' }} />
                   {error}
                 </div>
               )}
