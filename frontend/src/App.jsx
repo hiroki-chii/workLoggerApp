@@ -216,10 +216,10 @@ const PetIcon = ({ status, size = 40 }) => {
 
 const Logo = ({ size = 32, className = "" }) => {
   return (
-    <svg 
-      width={size} 
-      height={size} 
-      viewBox="0 0 200 200" 
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 200 200"
       xmlns="http://www.w3.org/2000/svg"
       className={className}
       style={{ display: 'inline-block', verticalAlign: 'middle' }}
@@ -230,18 +230,18 @@ const Logo = ({ size = 32, className = "" }) => {
           <stop offset="100%" style={{ stopColor: '#63b3ed', stopOpacity: 1 }} />
         </linearGradient>
       </defs>
-      
+
       <circle cx="100" cy="100" r="90" fill="url(#logoGrad)" opacity="0.1" />
       <circle cx="100" cy="100" r="70" fill="url(#logoGrad)" />
 
-      <path 
-        d="M 50 120 C 70 120, 80 85, 100 85 C 120 85, 130 120, 150 120" 
-        stroke="white" 
-        strokeWidth="10" 
-        strokeLinecap="round" 
-        fill="transparent" 
+      <path
+        d="M 50 120 C 70 120, 80 85, 100 85 C 120 85, 130 120, 150 120"
+        stroke="white"
+        strokeWidth="10"
+        strokeLinecap="round"
+        fill="transparent"
       />
-      
+
       <circle cx="100" cy="65" r="6" fill="white" />
     </svg>
   );
@@ -851,16 +851,16 @@ function App() {
                 <div style={{
                   margin: '1rem 0',
                   padding: '1rem',
-                  background: 'rgba(99, 102, 241, 0.1)',
-                  border: '1px solid rgba(99, 102, 241, 0.2)',
+                  background: 'rgba(239, 68, 68, 0.1)',
+                  border: '1px solid rgba(239, 68, 68, 0.2)',
                   borderRadius: '12px',
-                  color: '#6366f1',
+                  color: '#f87171',
                   fontSize: '0.9rem',
                   display: 'flex',
                   alignItems: 'center',
                   gap: '0.5rem'
                 }}>
-                  <RefreshCw size={16} className="animate-spin" style={{ animation: 'spin 2s linear infinite' }} />
+                  <RefreshCw size={16} />
                   {error}
                 </div>
               )}
@@ -1250,7 +1250,7 @@ function App() {
                       </div>
                     </div>
                     <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap' }}>
-                      <select 
+                      <select
                         value={settings.sliding_window_size || '90'}
                         onChange={(e) => handleSaveSetting('sliding_window_size', e.target.value)}
                         style={{ padding: '0.5rem', borderRadius: '6px', border: '1px solid rgba(255,255,255,0.1)', background: 'rgba(0,0,0,0.2)', color: 'var(--text)', fontSize: '0.9rem', minWidth: '200px' }}
@@ -1862,7 +1862,7 @@ function App() {
                     const val = e.target.checked ? 'true' : 'false';
                     handleSaveSetting('show_pet_in_mini', val);
                   }}
-                style={{ width: '12px', height: '12px', accentColor: 'var(--primary)' }}
+                  style={{ width: '12px', height: '12px', accentColor: 'var(--primary)' }}
                 />
                 <span>ペットを表示</span>
               </label>
