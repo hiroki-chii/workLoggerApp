@@ -117,8 +117,13 @@ body {
   -webkit-text-fill-color: transparent;
   position: relative;
   min-height: 32px;
+  justify-content: flex-start;
+}
+
+.sidebar-collapsed .logo {
   justify-content: center;
 }
+
 
 /* Modal */
 .modal-overlay {

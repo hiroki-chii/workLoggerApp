@@ -1705,8 +1705,7 @@ function App() {
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
-              <Logo size={15} />
-              <span style={{ fontSize: '0.75rem', fontWeight: '700', color: 'var(--mini-text-heading)' }}>
+              <span style={{ fontSize: '0.85rem', fontWeight: '700', color: 'var(--mini-text-heading)' }}>
                 {fatigueData.pomodoro ? 'ポモドーロ' : 'トラッキング'}
               </span>
             </div>
