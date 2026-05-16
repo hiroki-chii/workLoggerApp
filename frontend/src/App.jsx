@@ -662,6 +662,21 @@ function App() {
     setIsExportModalOpen(false);
   };
 
+  const handleExportTimetable = (mode) => {
+    let url = `${API_BASE}/export/timetable`;
+    if (mode === 'range') {
+      url += `?startDate=${exportRange.start}&endDate=${exportRange.end}`;
+    }
+
+    const link = document.createElement('a');
+    link.href = url;
+    link.setAttribute('download', 'work_timetable.csv');
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    setIsExportModalOpen(false);
+  };
+
 
 
   const handleCellClick = async (date, hour, minute) => {
@@ -2052,7 +2067,6 @@ function App() {
 
               <div className="export-option-card">
                 <div style={{ flex: 1 }}>
-                  <div style={{ fontWeight: '600', marginBottom: '0.5rem' }}>期間を指定して出力</div>
                   <div className="modal-date-picker">
                     <input
                       type="date"
@@ -2067,24 +2081,31 @@ function App() {
                     />
                   </div>
                 </div>
-                <button
-                  className="accent-btn mini"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    handleExportCsv('range');
-                  }}
-                >
-                  <Download size={14} /> 出力
-                </button>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                  <button
+                    className="accent-btn mini"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleExportCsv('range');
+                    }}
+                    title="詳細な履歴をCSV出力します"
+                  >
+                    <Download size={14} /> 履歴CSV
+                  </button>
+                  <button
+                    className="primary-btn mini"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleExportTimetable('range');
+                    }}
+                    style={{ background: 'var(--accent)', borderColor: 'var(--accent)' }}
+                    title="タイムテーブル形式（グリッド）でCSV出力します"
+                  >
+                    <Grid size={14} /> タイムテーブルCSV
+                  </button>
+                </div>
               </div>
 
-              <div className="export-option-card" onClick={() => handleExportCsv('all')}>
-                <div style={{ flex: 1 }}>
-                  <div style={{ fontWeight: '600', marginBottom: '0.25rem' }}>すべてのデータを出力</div>
-                  <div style={{ fontSize: '0.8rem', color: '#94a3b8' }}>全期間の記録を1つのCSVファイルとして保存します</div>
-                </div>
-                <button className="primary-btn mini secondary"><Download size={14} /> 出力</button>
-              </div>
             </div>
           </div>
         </div>

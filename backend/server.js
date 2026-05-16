@@ -464,6 +464,89 @@ app.get('/api/export', (req, res) => {
   }
 });
 
+app.get('/api/export/timetable', (req, res) => {
+  try {
+    const { startDate, endDate } = req.query;
+
+    let whereClause = "";
+    let params = [];
+    if (startDate && endDate) {
+      whereClause = ` WHERE date(timestamp, 'localtime') BETWEEN ? AND ? `;
+      params.push(startDate, endDate);
+    } else {
+      whereClause = ` WHERE date(timestamp, 'localtime', '-4 hours') = date('now', 'localtime', '-4 hours') `;
+    }
+
+    // ヒートマップと同じクエリでデータを取得
+    const query = `
+      WITH BucketCounts AS (
+        SELECT 
+          date(timestamp, 'localtime') as logDate,
+          strftime('%H', timestamp, 'localtime') as hour,
+          (strftime('%M', timestamp, 'localtime') / 15) * 15 as minute,
+          appName,
+          windowTitle as groupWindow,
+          COUNT(*) as taskCount
+        FROM logs
+        ${whereClause}
+        GROUP BY logDate, hour, minute, appName, groupWindow
+      ),
+      RankedBuckets AS (
+        SELECT 
+          b.logDate, b.hour, b.minute, b.appName, b.groupWindow, b.taskCount,
+          ROW_NUMBER() OVER(PARTITION BY b.logDate, b.hour, b.minute ORDER BY b.taskCount DESC) as rank
+        FROM BucketCounts b
+      )
+      SELECT logDate, hour, minute, appName as topApp, groupWindow as topWindow
+      FROM RankedBuckets
+      WHERE rank = 1
+    `;
+
+    const data = db.prepare(query).all(...params);
+
+    // 日付のリストを取得
+    const dates = [...new Set(data.map(d => d.logDate))].sort();
+    
+    // 時刻スロット（00:00 - 23:45）のリストを作成
+    const intervals = [];
+    for (let h = 0; h < 24; h++) {
+      for (let m = 0; m < 60; m += 15) {
+        intervals.push({ h, m: m.toString().padStart(2, '0') });
+      }
+    }
+
+    // CSV用の配列を作成
+    const csvData = intervals.map(({ h, m }) => {
+      const row = { time: `${h.toString().padStart(2, '0')}:${m}` };
+      dates.forEach(date => {
+        const cell = data.find(d => 
+          d.logDate === date && 
+          parseInt(d.hour) === h && 
+          parseInt(d.minute) === parseInt(m)
+        );
+        row[date] = cell ? (cell.topWindow || cell.topApp) : '';
+      });
+      return row;
+    });
+
+    res.setHeader('Content-Type', 'text/csv');
+    res.setHeader('Content-Disposition', 'attachment; filename="work_timetable.csv"');
+
+    const columns = { time: '時刻' };
+    dates.forEach(date => {
+      columns[date] = date;
+    });
+
+    stringify(csvData, {
+      header: true,
+      columns
+    }).pipe(res);
+  } catch (err) {
+    console.error('[Server] Timetable export error:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
 app.get('/api/heatmap', (req, res) => {
   try {
     const { startDate, endDate } = req.query;
