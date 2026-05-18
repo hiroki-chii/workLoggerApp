@@ -347,7 +347,7 @@ function App() {
       const [statsAppsRes, statsWindowsRes, logsRes, heatmapRes, settingsRes, titlesRes, rulesRes, fatigueRes] = await Promise.all([
         fetch(`${API_BASE}/stats?${params}&groupBy=appName`),
         fetch(`${API_BASE}/stats?${params}&groupBy=windowTitle`),
-        fetch(`${API_BASE}/logs?${params}`),
+        fetch(`${API_BASE}/logs`),
         fetch(`${API_BASE}/heatmap?${params}&groupBy=${groupBy}`),
         fetch(`${API_BASE}/settings`),
         fetch(`${API_BASE}/window-titles`),
@@ -1209,14 +1209,9 @@ function App() {
       case 'history':
         return (
           <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
-            {renderDateHeader('これまでの作業履歴')}
+            {renderDateHeader('過去1000件の作業履歴', false)}
             <div style={{ flex: 1, overflowY: 'auto', marginTop: '1rem' }}>
               <section className="card fade-in">
-                <div className="card-title" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                    <History size={20} /> 最近の作業履歴
-                  </div>
-                </div>
                 <div className="logs-table-container">
                   <table className="logs-table">
                     <thead>

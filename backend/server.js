@@ -127,7 +127,7 @@ app.get('/api/logs', (req, res) => {
       params.push(startDate, endDate);
     }
 
-    query += ' ORDER BY timestamp DESC LIMIT 100';
+    query += ' ORDER BY timestamp DESC LIMIT 1000';
     const logs = db.prepare(query).all(...params);
     res.json(logs);
   } catch (err) {
@@ -434,6 +434,23 @@ app.delete('/api/window-rules/:id', (req, res) => {
   }
 });
 
+// ウィンドウ名置換ルールの適用関数
+const applyWindowRules = (title, rules = []) => {
+  if (!title || title === 'アイドル状態' || title === '無操作') return title;
+
+  for (const rule of rules) {
+    let match = false;
+    if (rule.match_type === 'exact') match = title === rule.keyword;
+    else if (rule.match_type === 'startsWith') match = title.startsWith(rule.keyword);
+    else match = title.includes(rule.keyword); // contains
+
+    if (match) {
+      return rule.replace_with;
+    }
+  }
+  return title;
+};
+
 app.get('/api/export', (req, res) => {
   try {
     const { startDate, endDate } = req.query;
@@ -448,10 +465,17 @@ app.get('/api/export', (req, res) => {
     query += ' ORDER BY timestamp DESC';
     const logs = db.prepare(query).all(...params);
 
+    // ウィンドウ置換ルールを取得して適用
+    const rules = db.prepare('SELECT * FROM window_rules').all();
+    const processedLogs = logs.map(log => ({
+      ...log,
+      windowTitle: applyWindowRules(log.windowTitle, rules)
+    }));
+
     res.setHeader('Content-Type', 'text/csv');
     res.setHeader('Content-Disposition', 'attachment; filename="work_logs.csv"');
 
-    stringify(logs, {
+    stringify(processedLogs, {
       header: true,
       columns: {
         timestamp: '日時',
@@ -504,6 +528,9 @@ app.get('/api/export/timetable', (req, res) => {
 
     const data = db.prepare(query).all(...params);
 
+    // ウィンドウ置換ルールを取得
+    const rules = db.prepare('SELECT * FROM window_rules').all();
+
     // 日付のリストを取得
     const dates = [...new Set(data.map(d => d.logDate))].sort();
     
@@ -524,7 +551,15 @@ app.get('/api/export/timetable', (req, res) => {
           parseInt(d.hour) === h && 
           parseInt(d.minute) === parseInt(m)
         );
-        row[date] = cell ? (cell.topWindow || cell.topApp) : '';
+        let displayVal = '';
+        if (cell) {
+          if (cell.topWindow) {
+            displayVal = applyWindowRules(cell.topWindow, rules);
+          } else {
+            displayVal = cell.topApp || '';
+          }
+        }
+        row[date] = displayVal;
       });
       return row;
     });
