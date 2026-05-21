@@ -42,6 +42,7 @@ import {
   calcProgressWidth,
   calcProgressGradient,
   invokeIpc,
+  sendIpc,
   formatRemainingTime
 } from './utils/helpers';
 
@@ -496,6 +497,7 @@ function App() {
       if (status) {
         setTimeout(fetchData, 1000);
       }
+      sendIpc('window-event:notify', { type: 'sync' });
     }
   };
 
@@ -555,6 +557,7 @@ function App() {
         })
       ]);
       fetchData();
+      sendIpc('window-event:notify', { type: 'sync' });
     } catch (err) {
       console.error('Mode change error:', err);
     }
@@ -568,6 +571,7 @@ function App() {
         body: JSON.stringify({ action })
       });
       fetchData();
+      sendIpc('window-event:notify', { type: 'sync' });
     } catch (err) {
       console.error('Pomodoro control error:', err);
     }
@@ -611,7 +615,28 @@ function App() {
       checkRecordingStatus();
       checkPCStatus();
     }, 10000); // 10秒ごとにUI更新と記録状態の確認
-    return () => clearInterval(interval);
+
+    // ウィンドウ間イベントの受信登録
+    let removeListener = null;
+    if (window.require) {
+      const { ipcRenderer } = window.require('electron');
+      const handleReceived = (event, arg) => {
+        if (arg && arg.type === 'sync') {
+          fetchData();
+          checkRecordingStatus();
+          checkPCStatus();
+        }
+      };
+      ipcRenderer.on('window-event:received', handleReceived);
+      removeListener = () => {
+        ipcRenderer.removeListener('window-event:received', handleReceived);
+      };
+    }
+
+    return () => {
+      clearInterval(interval);
+      if (removeListener) removeListener();
+    };
   }, [dateRange, groupBy]); // 期間または集計単位が変更されたら再取得
 
   const handleSaveSetting = async (key, value) => {
@@ -624,6 +649,7 @@ function App() {
         body: JSON.stringify({ key, value: finalValue })
       });
       setSettings(prev => ({ ...prev, [key]: finalValue }));
+      sendIpc('window-event:notify', { type: 'sync' });
     } catch (err) {
       console.error('設定の保存に失敗しました:', err);
     }
@@ -639,6 +665,7 @@ function App() {
       if (res.ok) {
         alert('ログをすべて削除しました。');
         fetchData(); // データをリフレッシュ
+        sendIpc('window-event:notify', { type: 'sync' });
       }
     } catch (err) {
       console.error('ログの削除に失敗しました:', err);
@@ -1337,6 +1364,7 @@ function App() {
                               document.getElementById('newRuleKeyword').value = '';
                               document.getElementById('newRuleReplace').value = '';
                               fetchData(); // データをリロードして新しいルールを適用
+                              sendIpc('window-event:notify', { type: 'sync' });
                             }
                           } catch (err) {
                             console.error(err);
@@ -1368,6 +1396,7 @@ function App() {
                                   if (res.ok) {
                                     setEditingRuleId(null);
                                     fetchData();
+                                    sendIpc('window-event:notify', { type: 'sync' });
                                   }
                                 } catch (err) {
                                   console.error(err);
@@ -1416,6 +1445,7 @@ function App() {
                                     if (res.ok) {
                                       setEditingRuleId(null);
                                       fetchData();
+                                      sendIpc('window-event:notify', { type: 'sync' });
                                     }
                                   } catch (e) {
                                     console.error(e);
@@ -1465,6 +1495,7 @@ function App() {
                                   try {
                                     await fetch(`${API_BASE}/window-rules/${rule.id}`, { method: 'DELETE' });
                                     fetchData();
+                                    sendIpc('window-event:notify', { type: 'sync' });
                                   } catch (e) { }
                                 }}
                                 style={{ background: 'none', border: 'none', color: '#f87171', cursor: 'pointer', padding: '0.4rem' }}
@@ -1499,6 +1530,7 @@ function App() {
                           if (window.confirm('今日の記録を消去し、作業開始時間をリセットしますか？')) {
                             await fetch('http://127.0.0.1:3001/api/fatigue/reset', { method: 'POST' });
                             fetchData();
+                            sendIpc('window-event:notify', { type: 'sync' });
                             alert('今日の記録と作業開始時間をリセットしました。');
                           }
                         }}

@@ -278,6 +278,15 @@ function startApp() {
   }
 
   // IPC ハンドラーの登録
+  ipcMain.on('window-event:notify', (event, arg) => {
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      mainWindow.webContents.send('window-event:received', arg);
+    }
+    if (miniWindow && !miniWindow.isDestroyed()) {
+      miniWindow.webContents.send('window-event:received', arg);
+    }
+  });
+
   ipcMain.handle('recording:start', () => {
     startCollector();
     return true;

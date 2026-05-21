@@ -98,6 +98,14 @@ export const invokeIpc = async (channel, ...args) => {
   return null;
 };
 
+// Electron IPC でメッセージを送信するヘルパー（通知用）
+export const sendIpc = (channel, ...args) => {
+  if (window.require) {
+    const { ipcRenderer } = window.require('electron');
+    ipcRenderer.send(channel, ...args);
+  }
+};
+
 // ポモドーロの残り時間を表示用にフォーマット
 export const formatRemainingTime = (localRemainingSeconds, pomodoroData) => {
   const sec = localRemainingSeconds ?? pomodoroData?.remainingSeconds ?? 0;
