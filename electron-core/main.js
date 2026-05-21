@@ -43,8 +43,30 @@ function startApp() {
       db.close();
 
       if (xObj && yObj) {
-        x = parseInt(xObj.value, 10);
-        y = parseInt(yObj.value, 10);
+        const savedX = parseInt(xObj.value, 10);
+        const savedY = parseInt(yObj.value, 10);
+        
+        if (!isNaN(savedX) && !isNaN(savedY)) {
+          // 保存された位置が、現在接続されているいずれかのディスプレイの表示エリア内にあるか検証
+          const displays = screen.getAllDisplays();
+          const isWithinAnyScreen = displays.some(display => {
+            const bounds = display.bounds;
+            // ミニウィンドウの左上がディスプレイの範囲内に入っているか
+            return (
+              savedX >= bounds.x &&
+              savedX < bounds.x + bounds.width &&
+              savedY >= bounds.y &&
+              savedY < bounds.y + bounds.height
+            );
+          });
+
+          if (isWithinAnyScreen) {
+            x = savedX;
+            y = savedY;
+          } else {
+            console.log('[Main] Saved mini window position is out of screen bounds. Resetting to default.');
+          }
+        }
       }
     } catch (err) {
       console.error('[Main] Failed to read mini window position:', err);
@@ -69,11 +91,14 @@ function startApp() {
 
     const isDev = !app.isPackaged;
     const devUrl = process.env.VITE_DEV_SERVER_URL || 'http://localhost:5173';
-    const miniUrl = isDev 
-      ? `${devUrl}?mini=true` 
-      : `file://${path.join(PROJECT_ROOT, 'frontend/dist/index.html')}?mini=true`;
 
-    miniWindow.loadURL(miniUrl);
+    if (isDev) {
+      miniWindow.loadURL(`${devUrl}?mini=true`);
+    } else {
+      miniWindow.loadFile(path.join(PROJECT_ROOT, 'frontend/dist/index.html'), {
+        query: { mini: 'true' }
+      });
+    }
 
     miniWindow.on('move', () => {
       try {
@@ -108,11 +133,13 @@ function startApp() {
 
     const isDev = !app.isPackaged;
     const devUrl = process.env.VITE_DEV_SERVER_URL || 'http://localhost:5173';
-    const startUrl = isDev 
-      ? devUrl 
-      : `file://${path.join(PROJECT_ROOT, 'frontend/dist/index.html')}`;
 
-    mainWindow.loadURL(startUrl);
+    if (isDev) {
+      mainWindow.loadURL(devUrl);
+    } else {
+      mainWindow.loadFile(path.join(PROJECT_ROOT, 'frontend/dist/index.html'));
+    }
+
     mainWindow.once('ready-to-show', () => {
       mainWindow.show();
     });
