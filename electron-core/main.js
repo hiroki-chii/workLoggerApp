@@ -45,7 +45,7 @@ function startApp() {
       if (xObj && yObj) {
         const savedX = parseInt(xObj.value, 10);
         const savedY = parseInt(yObj.value, 10);
-        
+
         if (!isNaN(savedX) && !isNaN(savedY)) {
           // 保存された位置が、現在接続されているいずれかのディスプレイの表示エリア内にあるか検証
           const displays = screen.getAllDisplays();
@@ -222,7 +222,7 @@ function startApp() {
         }
       }
     ]);
-    tray.setToolTip('PulseWork');
+    tray.setToolTip('ゆとリズム');
     tray.setContextMenu(contextMenu);
 
     tray.on('click', () => {
@@ -242,8 +242,8 @@ function startApp() {
     };
 
     if (!serverProcess) {
-      serverProcess = spawn(process.execPath, [path.join(PROJECT_ROOT, 'backend', 'server.js')], { 
-        env, 
+      serverProcess = spawn(process.execPath, [path.join(PROJECT_ROOT, 'backend', 'server.js')], {
+        env,
         stdio: 'inherit',
         windowsHide: true
       });
@@ -261,8 +261,8 @@ function startApp() {
       ELECTRON_RUN_AS_NODE: '1'
     };
 
-    collectorProcess = spawn(process.execPath, [path.join(PROJECT_ROOT, 'backend', 'collector.js')], { 
-      env, 
+    collectorProcess = spawn(process.execPath, [path.join(PROJECT_ROOT, 'backend', 'collector.js')], {
+      env,
       stdio: 'inherit',
       windowsHide: true
     });
