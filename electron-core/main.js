@@ -5,6 +5,10 @@ const { spawn } = require('child_process');
 // アプリケーション名を最優先で設定 (パス決定に影響するため)
 app.setName('workloggerapp');
 
+// Windowsアップデート後のGPUドライバ/サンドボックス競合によるクラッシュ暫定対策
+app.commandLine.appendSwitch('disable-gpu');
+app.commandLine.appendSwitch('no-sandbox');
+
 // プロジェクトルートへのパス
 const PROJECT_ROOT = path.join(__dirname, '..');
 // システムの APPDATA を直接参照してパスを固定

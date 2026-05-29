@@ -1,5 +1,13 @@
 # 作業ログ
 
+## 2026-05-29 09:55
+- Windowsアップデート後の起動直後クラッシュ不具合への暫定対策を適用。
+  - 原因：Windowsアップデートに伴うGPUドライバやサンドボックスセキュリティとChromiumの競合。
+  - 対策：`electron-core/main.js` のアプリ初期化部分に `app.commandLine.appendSwitch('disable-gpu')` および `app.commandLine.appendSwitch('no-sandbox')` を追加。これにより、起動時に強制終了する問題を回避。
+
+## 2026-05-21 14:58
+- `/rebuild-overwrite` ワークフローを実行。既存の `dist-pulse` ディレクトリの成果物をクリアし、`npm run build` を実行してインストーラー（nsis / portable）の上書き再ビルドを完了。
+
 ## 2026-05-21 11:33
 - `/rebuild-overwrite` ワークフローを実行。メイン画面とミニ画面のリアルタイム同期ズレ修正を適用したインストーラー（nsis / portable）の上書き再ビルドを完了。
 
