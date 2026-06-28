@@ -25,7 +25,8 @@ import {
 
   HelpCircle,
   X,
-  Edit2
+  Edit2,
+  Bell
 } from 'lucide-react';
 import {
   Chart as ChartJS,
@@ -1302,6 +1303,35 @@ function App() {
                       ・<strong style={{ color: 'var(--text)' }}>６０分</strong>: 短時間の集中作業や、すぐに休憩を取りたい方向け。疲労レベルの変動が早くなります。<br />
                       ・<strong style={{ color: 'var(--text)' }}>９０分</strong>: 一般的な作業サイクルに適した標準設定。適度な間隔での休憩を促します。<br />
                       ・<strong style={{ color: 'var(--text)' }}>１２０分</strong>: 長時間の継続的な作業を行う方向け。疲労レベルがゆっくりと上昇します。
+                    </div>
+                  </div>
+
+                  {/* アラート通知設定セクション */}
+                  <div style={{ marginBottom: '2rem', padding: '1.5rem', background: 'rgba(255,255,255,0.02)', borderRadius: '16px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '1.5rem' }}>
+                      <Bell size={20} color="var(--primary)" />
+                      <div>
+                        <div style={{ fontWeight: '600' }}>限界状態（Critical）時のアラート通知</div>
+                        <div style={{ fontSize: '0.8rem', color: '#94a3b8' }}>疲労状態が Critical（限界）に達した際に、最前面ポップアップやデスクトップ通知を表示して休憩を促すかを設定します。</div>
+                      </div>
+                    </div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                      <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer', userSelect: 'none' }}>
+                        <input
+                          type="checkbox"
+                          checked={settings.enable_fatigue_alert === 'true'}
+                          onChange={(e) => handleSaveSetting('enable_fatigue_alert', e.target.checked ? 'true' : 'false')}
+                          style={{
+                            width: '18px',
+                            height: '18px',
+                            accentColor: 'var(--primary)',
+                            cursor: 'pointer'
+                          }}
+                        />
+                        <span style={{ fontSize: '0.9rem', color: 'var(--text)' }}>
+                          {settings.enable_fatigue_alert === 'true' ? '有効（推奨）' : '無効'}
+                        </span>
+                      </label>
                     </div>
                   </div>
 
