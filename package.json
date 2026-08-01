@@ -32,6 +32,7 @@
   "build": {
     "appId": "com.workloggerapp.app",
     "productName": "ゆとリズム",
+    "compression": "store",
     "directories": {
       "output": "dist-pulse"
     },
