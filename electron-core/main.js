@@ -1,4 +1,4 @@
-const { app, BrowserWindow, ipcMain, dialog, Menu, Tray } = require('electron');
+const { app, BrowserWindow, ipcMain, dialog, Menu, Tray, powerMonitor } = require('electron');
 const path = require('path');
 const { spawn } = require('child_process');
 
@@ -6,14 +6,19 @@ const { spawn } = require('child_process');
 app.setName('workloggerapp');
 
 // Windowsアップデート後のGPUドライバ/サンドボックス競合によるクラッシュ暫定対策
-app.commandLine.appendSwitch('disable-gpu');
+if (process.env.WORKLOGGER_DISABLE_GPU === '1') app.commandLine.appendSwitch('disable-gpu');
 app.commandLine.appendSwitch('no-sandbox');
 
 // プロジェクトルートへのパス
 const PROJECT_ROOT = path.join(__dirname, '..');
 // システムの APPDATA を直接参照してパスを固定
-const SHARED_USER_DATA = path.join(process.env.APPDATA, 'workloggerapp');
+const SHARED_USER_DATA = process.env.WORKLOGGER_DATA_DIR || path.join(process.env.APPDATA, 'workloggerapp');
 const DB_PATH = path.join(SHARED_USER_DATA, 'logs.db');
+const MONITOR_SCRIPT_PATH = app.isPackaged
+  ? path.join(process.resourcesPath, 'monitor.ps1')
+  : path.join(PROJECT_ROOT, 'backend', 'monitor.ps1');
+if (process.env.WORKLOGGER_DATA_DIR) app.setPath('userData', SHARED_USER_DATA);
+const hasSingleInstanceLock = app.requestSingleInstanceLock();
 
 function startApp() {
   let serverProcess = null;
@@ -22,6 +27,10 @@ function startApp() {
   let miniWindow = null;
   let tray = null;
   let isQuitting = false;
+  let recordingRequested = true;
+  let suspended = false;
+  let serverReady = false;
+  let alertQueue = Promise.resolve();
 
   function createMiniWindow() {
     if (miniWindow) {
@@ -89,6 +98,7 @@ function startApp() {
       webPreferences: {
         nodeIntegration: true,
         contextIsolation: false,
+        backgroundThrottling: false,
       },
       icon: path.join(PROJECT_ROOT, 'assets', 'icon.png'),
     });
@@ -104,18 +114,32 @@ function startApp() {
       });
     }
 
-    miniWindow.on('move', () => {
+    let moveTimer;
+    let savedPosition;
+    function savePosition() {
+      clearTimeout(moveTimer);
+      if (!savedPosition) return;
+      const [mx, my] = savedPosition;
+      savedPosition = null;
+      let db;
       try {
-        const [mx, my] = miniWindow.getPosition();
         const Database = require('better-sqlite3');
-        const db = new Database(DB_PATH);
-        db.prepare('INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)').run('mini_window_x', mx.toString());
-        db.prepare('INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)').run('mini_window_y', my.toString());
-        db.close();
+        db = new Database(DB_PATH);
+        db.transaction(() => {
+          const save = db.prepare('INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)');
+          save.run('mini_window_x', String(mx));
+          save.run('mini_window_y', String(my));
+        })();
       } catch (err) {
         console.error('[Main] Failed to save mini window position:', err);
-      }
+      } finally { if (db) db.close(); }
+    }
+    miniWindow.on('move', () => {
+      savedPosition = miniWindow.getPosition();
+      clearTimeout(moveTimer);
+      moveTimer = setTimeout(savePosition, 300);
     });
+    miniWindow.on('close', savePosition);
 
     miniWindow.on('closed', () => {
       miniWindow = null;
@@ -129,7 +153,7 @@ function startApp() {
       webPreferences: {
         nodeIntegration: true,
         contextIsolation: false,
-        backgroundThrottling: false,
+        backgroundThrottling: true,
       },
       icon: path.join(PROJECT_ROOT, 'assets', 'icon.png'),
       show: false,
@@ -221,7 +245,7 @@ function startApp() {
         click: () => {
           isQuitting = true;
           stopCollector();
-          if (serverProcess) serverProcess.kill();
+          stopServer();
           app.quit();
         }
       }
@@ -238,47 +262,65 @@ function startApp() {
 
 
   function startServer() {
-    const env = {
-      ...process.env,
-      DB_PATH,
-      MONITOR_SCRIPT_PATH: path.join(PROJECT_ROOT, 'backend', 'monitor.ps1'),
-      ELECTRON_RUN_AS_NODE: '1'
-    };
-
-    if (!serverProcess) {
-      serverProcess = spawn(process.execPath, [path.join(PROJECT_ROOT, 'backend', 'server.js')], {
-        env,
-        stdio: 'inherit',
-        windowsHide: true
-      });
-      console.log('[Main] Server started.');
-    }
+    serverProcess = spawn(process.execPath, [path.join(PROJECT_ROOT, 'backend', 'server.js')], {
+      env: { ...process.env, DB_PATH, ELECTRON_RUN_AS_NODE: '1' },
+      stdio: ['ignore', 'inherit', 'inherit', 'ipc'], windowsHide: true
+    });
+    serverProcess.on('message', message => {
+      if (message.type === 'ready') {
+        serverReady = true;
+        if (recordingRequested && !suspended) startCollector();
+      } else if (message.type === 'alert') {
+        alertQueue = alertQueue.then(() => !isQuitting && showDanger(message.message)).catch(console.error);
+      }
+    });
+    serverProcess.on('error', error => console.error('[Main] Server failed:', error));
+    serverProcess.on('exit', () => {
+      serverReady = false;
+      serverProcess = null;
+      stopCollector();
+    });
   }
 
   function startCollector() {
-    if (collectorProcess) return;
-
-    const env = {
-      ...process.env,
-      DB_PATH,
-      MONITOR_SCRIPT_PATH: path.join(PROJECT_ROOT, 'backend', 'monitor.ps1'),
-      ELECTRON_RUN_AS_NODE: '1'
-    };
-
-    collectorProcess = spawn(process.execPath, [path.join(PROJECT_ROOT, 'backend', 'collector.js')], {
-      env,
-      stdio: 'inherit',
-      windowsHide: true
+    if (collectorProcess || !serverReady || suspended || isQuitting) return;
+    const child = spawn(process.execPath, [path.join(PROJECT_ROOT, 'backend', 'collector.js')], {
+      env: { ...process.env, DB_PATH, MONITOR_SCRIPT_PATH, ELECTRON_RUN_AS_NODE: '1' },
+      stdio: ['ignore', 'inherit', 'inherit', 'ipc'], windowsHide: true
     });
-    console.log('[Main] Collector started.');
+    collectorProcess = child;
+    child.monitorPid = null;
+    child.on('message', message => {
+      if (message.type === 'monitor-pid') child.monitorPid = message.pid;
+    });
+    child.on('error', error => console.error('[Main] Collector failed:', error));
+    child.on('exit', () => {
+      if (collectorProcess === child) collectorProcess = null;
+      if (child.monitorPid) { try { process.kill(child.monitorPid); } catch {} }
+    });
   }
 
   function stopCollector() {
-    if (collectorProcess) {
-      collectorProcess.kill();
-      collectorProcess = null;
-      console.log('[Main] Collector stopped.');
-    }
+    const child = collectorProcess;
+    if (!child) return;
+    collectorProcess = null;
+    if (child.connected) child.send({ type: 'shutdown' }, () => {});
+    // Windows terminate bypasses child cleanup: stop the monitor first if shutdown stalls.
+    const fallback = setTimeout(() => {
+      if (child.monitorPid) { try { process.kill(child.monitorPid); } catch {} }
+      child.kill();
+    }, 2000);
+    child.once('exit', () => clearTimeout(fallback));
+  }
+
+  function stopServer() {
+    const child = serverProcess;
+    if (!child) return;
+    serverProcess = null;
+    serverReady = false;
+    if (child.connected) child.send({ type: 'shutdown' }, () => {});
+    const fallback = setTimeout(() => child.kill(), 2000);
+    child.once('exit', () => clearTimeout(fallback));
   }
 
   // IPC ハンドラーの登録
@@ -292,11 +334,13 @@ function startApp() {
   });
 
   ipcMain.handle('recording:start', () => {
+    recordingRequested = true;
     startCollector();
-    return true;
+    return !!collectorProcess;
   });
 
   ipcMain.handle('recording:stop', () => {
+    recordingRequested = false;
     stopCollector();
     return false;
   });
@@ -308,7 +352,7 @@ function startApp() {
   ipcMain.handle('app:quit-completely', () => {
     isQuitting = true;
     stopCollector();
-    if (serverProcess) serverProcess.kill();
+    stopServer();
     app.quit();
     return true;
   });
@@ -331,7 +375,7 @@ function startApp() {
     return true;
   });
 
-  ipcMain.handle('alert:danger', async (event, message) => {
+  async function showDanger(message) {
     const parentWin = mainWindow && mainWindow.isVisible() ? mainWindow : (miniWindow && miniWindow.isVisible() ? miniWindow : null);
     if (parentWin) {
       if (parentWin.isMinimized()) parentWin.restore();
@@ -351,7 +395,8 @@ function startApp() {
       parentWin.setAlwaysOnTop(false);
     }
     return true;
-  });
+  }
+  ipcMain.handle('alert:danger', (event, message) => showDanger(message));
 
   ipcMain.handle('alert:confirm', async (event, { title, message }) => {
     const parentWin = mainWindow && mainWindow.isVisible() ? mainWindow : (miniWindow && miniWindow.isVisible() ? miniWindow : null);
@@ -375,7 +420,7 @@ function startApp() {
   // 初期化
   startServer();
   // アプリケーション起動時に自動で記録（collector）を開始
-  startCollector();
+  // Collector starts after the server initializes the database.
   createWindow();
   createTray();
 
@@ -385,8 +430,28 @@ function startApp() {
 
   app.on('before-quit', () => {
     isQuitting = true;
-    if (serverProcess) serverProcess.kill();
-    if (collectorProcess) collectorProcess.kill();
+    stopServer();
+    stopCollector();
+  });
+
+  powerMonitor.on('suspend', () => {
+    suspended = true;
+    stopCollector();
+  });
+  powerMonitor.on('resume', () => {
+    suspended = false;
+    if (recordingRequested) startCollector();
+    if (serverProcess?.connected) serverProcess.send({ type: 'resume' }, () => {});
+    for (const win of [mainWindow, miniWindow]) {
+      if (win && !win.isDestroyed()) win.webContents.send('window-event:received', { type: 'sync' });
+    }
+  });
+
+  app.on('second-instance', () => {
+    if (!mainWindow) createWindow();
+    if (mainWindow.isMinimized()) mainWindow.restore();
+    mainWindow.show();
+    mainWindow.focus();
   });
 
   app.on('activate', () => {
@@ -395,7 +460,9 @@ function startApp() {
   });
 }
 
-app.whenReady().then(() => {
+if (!hasSingleInstanceLock) {
+  app.quit();
+} else app.whenReady().then(() => {
   // カスタムメニューの設定 (Viewのみ残す)
   const template = [
     {

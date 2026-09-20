@@ -8,14 +8,14 @@
     "dev:frontend": "cd frontend && npm run dev",
     "dev:electron": "npx electron electron-core/main.js",
     "build:frontend": "npm run build --prefix frontend",
-    "build": "npm run build:frontend && electron-builder"
+    "build": "npm run build:frontend && electron-builder",
+    "test": "set ELECTRON_RUN_AS_NODE=1&& electron --test test/activity-state.test.js test/time-range.test.js test/screen-data.test.mjs test/server-integration.test.js test/collector-integration.test.js test/monitor-helper.test.js"
   },
   "keywords": [],
   "author": "",
   "license": "ISC",
   "type": "commonjs",
   "dependencies": {
-    "@google/generative-ai": "^0.24.1",
     "better-sqlite3": "^12.8.0",
     "cors": "^2.8.6",
     "csv-stringify": "^6.7.0",
@@ -32,18 +32,35 @@
   "build": {
     "appId": "com.workloggerapp.app",
     "productName": "ゆとリズム",
-    "compression": "store",
+    "compression": "normal",
+    "electronLanguages": [
+      "ja",
+      "en-US"
+    ],
     "directories": {
       "output": "dist-pulse"
     },
     "files": [
       "electron-core/**/*",
       "backend/**/*",
+      "!backend/monitor.ps1",
       "frontend/dist/**/*",
       "assets/**/*",
-      "package.json"
+      "package.json",
+      "!node_modules/better-sqlite3/deps/**/*",
+      "!node_modules/better-sqlite3/src/**/*",
+      "!node_modules/better-sqlite3/binding.gyp"
     ],
-    "asar": false,
+    "asar": true,
+    "asarUnpack": [
+      "node_modules/better-sqlite3/build/Release/*.node"
+    ],
+    "extraResources": [
+      {
+        "from": "backend/monitor.ps1",
+        "to": "monitor.ps1"
+      }
+    ],
     "win": {
       "target": [
         "nsis",

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import {
   LayoutDashboard,
   History,
@@ -35,6 +35,8 @@ import {
   Legend
 } from 'chart.js';
 import { Pie } from 'react-chartjs-2';
+import { RemainingTime, ActivityProgress } from './ActivityTimer';
+import { createScreenLoader } from './utils/screen-data.mjs';
 import { useTheme } from './ThemeProvider';
 import {
   getStatusColor,
@@ -43,8 +45,7 @@ import {
   calcProgressWidth,
   calcProgressGradient,
   invokeIpc,
-  sendIpc,
-  formatRemainingTime
+  sendIpc
 } from './utils/helpers';
 
 ChartJS.register(ArcElement, Tooltip, Legend);
@@ -250,6 +251,14 @@ const Logo = ({ size = 32, className = "" }) => {
 };
 
 function App() {
+  const isMiniMode = window.location.search.includes('mini=true');
+  const requestRef = useRef(null);
+  const loaderRef = useRef(null);
+  if (!loaderRef.current) loaderRef.current = createScreenLoader(async (path, signal) => {
+    const response = await fetch(API_BASE + path, { signal });
+    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+    return response.json();
+  });
   const [stats, setStats] = useState([]);
   const [totalAppsCount, setTotalAppsCount] = useState(0);
   const [totalWindowsCount, setTotalWindowsCount] = useState(0);
@@ -273,7 +282,6 @@ function App() {
   const [error, setError] = useState(null);
   const [activeTab, setActiveTab] = useState('dashboard');
   const timetableContainerRef = useRef(null);
-  const prevStatusRef = useRef(null);
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const [isRecording, setIsRecording] = useState(false);
   const [idleSeconds, setIdleSeconds] = useState(0);
@@ -291,109 +299,38 @@ function App() {
   const [selectedSlot, setSelectedSlot] = useState(null);
   const [isBreakdownModalOpen, setIsBreakdownModalOpen] = useState(false);
   const [breakdownGroupBy, setBreakdownGroupBy] = useState('windowTitle'); // 'appName', 'windowTitle'
-  const lastPomodoroPhaseRef = useRef(null);
-  const [localRemainingSeconds, setLocalRemainingSeconds] = useState(null);
-
-  // ポモドーロの1秒刻みカウントダウン
-  useEffect(() => {
-    if (localRemainingSeconds === null || localRemainingSeconds <= 0 || fatigueData.pomodoro?.status === 'paused') return;
-
-    const timer = setInterval(() => {
-      setLocalRemainingSeconds(prev => {
-        if (prev === null || prev <= 0) return prev;
-        return prev - 1;
-      });
-    }, 1000);
-
-    return () => clearInterval(timer);
-  }, [localRemainingSeconds !== null, fatigueData.pomodoro?.status]);
-
-  useEffect(() => {
-    // ミニ画面（ウィジェット）ではアラートを出さないようにして二重通知を防止
-    if (window.location.search.includes('mini=true')) return;
-
-    if (fatigueData.pomodoro && fatigueData.pomodoro.phase !== lastPomodoroPhaseRef.current) {
-      if (lastPomodoroPhaseRef.current !== null) {
-        const title = fatigueData.pomodoro.phase === 'work' ? '【作業開始】' : '【休憩時間】';
-        const message = fatigueData.pomodoro.phase === 'work'
-          ? `${fatigueData.pomodoro.workMin}分間の集中タイムです。頑張りましょう！`
-          : `${fatigueData.pomodoro.breakMin}分間の休憩です。リラックスしてください。`;
-
-        invokeIpc('alert:danger', `${title}\n\n${message}`).then(result => {
-          if (result === null && window.Notification) {
-            new window.Notification("ゆとリズム からのお知らせ", {
-              body: `${title} ${message}`
-            });
-          }
-        });
-      }
-      lastPomodoroPhaseRef.current = fatigueData.pomodoro.phase;
-    } else if (!fatigueData.pomodoro) {
-      lastPomodoroPhaseRef.current = null;
-    }
-  }, [fatigueData.pomodoro?.phase, fatigueData.pomodoro]);
-
   const [windowRules, setWindowRules] = useState([]);
   const [editingRuleId, setEditingRuleId] = useState(null);
   const [editForm, setEditForm] = useState({ keyword: '', replace_with: '', match_type: 'contains', color: '#5c6ac4' });
 
 
 
-  const fetchData = async () => {
+  const fetchData = async ({ refreshMetadata = true } = {}) => {
+    if (refreshMetadata) loaderRef.current.invalidate();
+    if (document.hidden) return;
+    if (requestRef.current) {
+      if (!refreshMetadata) return;
+      requestRef.current.abort();
+    }
+    const controller = new AbortController();
+    requestRef.current = controller;
+    const timeout = setTimeout(() => controller.abort(), 15000);
     try {
       const params = new URLSearchParams({
         startDate: dateRange.start,
         endDate: dateRange.end
       }).toString();
 
-      const [statsAppsRes, statsWindowsRes, logsRes, heatmapRes, settingsRes, titlesRes, rulesRes, fatigueRes] = await Promise.all([
-        fetch(`${API_BASE}/stats?${params}&groupBy=appName`),
-        fetch(`${API_BASE}/stats?${params}&groupBy=windowTitle`),
-        fetch(`${API_BASE}/logs`),
-        fetch(`${API_BASE}/heatmap?${params}&groupBy=${groupBy}`),
-        fetch(`${API_BASE}/settings`),
-        fetch(`${API_BASE}/window-titles`),
-        fetch(`${API_BASE}/window-rules`),
-        fetch(`${API_BASE}/fatigue`)
-      ]);
-
-      if (!statsAppsRes.ok || !statsWindowsRes.ok || !logsRes.ok || !heatmapRes.ok || !settingsRes.ok) {
-        throw new Error(`Server returned error: ${statsAppsRes.status}`);
-      }
-
-      const statsAppsData = await statsAppsRes.json();
-      const statsWindowsData = await statsWindowsRes.json();
-      const logsData = await logsRes.json();
-      const heatmapData = await heatmapRes.json();
-      const settingsData = await settingsRes.json();
-      const titlesData = await titlesRes.json();
-      const rulesData = await rulesRes.json();
-      if (fatigueRes && fatigueRes.ok) {
-        const fData = await fatigueRes.json();
-        setFatigueData(fData);
-
-        // ポモドーロの残り時間をローカルで同期
-        if (fData.pomodoro) {
-          setLocalRemainingSeconds(fData.pomodoro.remainingSeconds);
-        } else {
-          setLocalRemainingSeconds(null);
-        }
-
-        if (!window.location.search.includes('mini=true') && fData.statusName === 'Critical' && settingsData.enable_fatigue_alert === 'true') {
-          if (prevStatusRef.current !== 'Critical') {
-            const message = `長時間の作業お疲れ様です。そろそろ休憩を取りませんか？`;
-            const result = await invokeIpc('alert:danger', message);
-            if (result === null && window.Notification) {
-              new window.Notification("ゆとリズム からのお知らせ", {
-                body: message
-              });
-            }
-          }
-        }
-        prevStatusRef.current = fData.statusName;
-      }
-
-      setWindowRules(rulesData);
+      const data = await loaderRef.current.load({
+        mini: isMiniMode, tab: activeTab, params, signal: controller.signal
+      });
+      if (controller.signal.aborted) return;
+      const { statsApps: statsAppsData, statsWindows: statsWindowsData, logs: logsData,
+        heatmap: heatmapData, settings: settingsData, titles: titlesData, rules: rulesData } = data;
+      setFatigueData(data.fatigue);
+      setIdleSeconds(data.status.idleSeconds);
+      checkRecordingStatus();
+      if (data.needs.rules) setWindowRules(rulesData);
 
       // フロントエンドでの表示名置換と再集計
       const processedLogs = logsData.map(log => ({ ...log, ...applyWindowRules(log.windowTitle, rulesData) }));
@@ -440,8 +377,10 @@ function App() {
         mergedApps[truncated].count += stat.count;
       });
 
-      setTotalAppsCount(Object.keys(mergedApps).length);
-      setTotalWindowsCount(Object.keys(mergedWindows).length);
+      if (data.needs.stats) {
+        setTotalAppsCount(Object.keys(mergedApps).length);
+        setTotalWindowsCount(Object.keys(mergedWindows).length);
+      }
 
       let processedStats = [];
       if (groupBy === 'windowTitle') {
@@ -466,17 +405,21 @@ function App() {
         }
       }
 
-      setStats(processedStats);
-      setLogs(processedLogs);
-      setHeatmapData(processedHeatmap);
+      if (data.needs.stats) setStats(processedStats);
+      if (data.needs.logs) setLogs(processedLogs);
+      if (data.needs.heatmap) setHeatmapData(processedHeatmap);
       setSettings(settingsData);
-      setWindowTitles(Array.isArray(titlesData) ? titlesData : []);
+      if (data.needs.titles) setWindowTitles(Array.isArray(titlesData) ? titlesData : []);
       setError(null);
       setLoading(false);
     } catch (err) {
+      if (controller.signal.aborted) return;
       console.error('データの取得に失敗しました:', err);
       setError('サーバーの準備が整うのを待っています。しばらくお待ちください...');
       setLoading(false);
+    } finally {
+      clearTimeout(timeout);
+      if (requestRef.current === controller) requestRef.current = null;
     }
   };
 
@@ -502,16 +445,6 @@ function App() {
     }
   };
 
-  const checkPCStatus = async () => {
-    try {
-      const res = await fetch(`${API_BASE}/status`);
-      const data = await res.json();
-      setIdleSeconds(data.idleSeconds);
-    } catch (err) {
-      console.error('PCステータスの取得に失敗:', err);
-    }
-  };
-
   const handleModeChange = async (newMode) => {
     // Critical時にポモドーロモードへ切り替える際の警告
     if (newMode.startsWith('pomodoro') && fatigueData.currentMode === 'tracking' && fatigueData.statusName === 'Critical') {
@@ -534,29 +467,15 @@ function App() {
         initialRemainingMs = (mins * 60 * 1000).toString();
       }
 
-      await Promise.all([
-        fetch(`${API_BASE}/settings`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ key: 'current_mode', value: newMode })
-        }),
-        fetch(`${API_BASE}/settings`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ key: 'pomodoro_start_ms', value: now })
-        }),
-        // モード変更時はステータスを paused に、残り時間をフルに設定（自動再生しない）
-        fetch(`${API_BASE}/settings`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ key: 'pomodoro_status', value: newMode === 'tracking' ? 'running' : 'paused' })
-        }),
-        fetch(`${API_BASE}/settings`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ key: 'pomodoro_remaining_ms', value: initialRemainingMs })
-        })
-      ]);
+      const response = await fetch(`${API_BASE}/settings`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ settings: {
+          current_mode: newMode, pomodoro_start_ms: now,
+          pomodoro_status: newMode === 'tracking' ? 'running' : 'paused',
+          pomodoro_remaining_ms: initialRemainingMs, pomodoro_paused_phase: 'work'
+        } })
+      });
+      if (!response.ok) throw new Error('設定を保存できませんでした');
       fetchData();
       sendIpc('window-event:notify', { type: 'sync' });
     } catch (err) {
@@ -608,37 +527,50 @@ function App() {
 
 
   useEffect(() => {
-    fetchData();
-    checkRecordingStatus();
-    checkPCStatus();
-    const interval = setInterval(() => {
-      fetchData();
-      checkRecordingStatus();
-      checkPCStatus();
-    }, 10000); // 10秒ごとにUI更新と記録状態の確認
-
-    // ウィンドウ間イベントの受信登録
-    let removeListener = null;
-    if (window.require) {
-      const { ipcRenderer } = window.require('electron');
-      const handleReceived = (event, arg) => {
-        if (arg && arg.type === 'sync') {
-          fetchData();
-          checkRecordingStatus();
-          checkPCStatus();
-        }
-      };
-      ipcRenderer.on('window-event:received', handleReceived);
-      removeListener = () => {
-        ipcRenderer.removeListener('window-event:received', handleReceived);
-      };
-    }
-
-    return () => {
-      clearInterval(interval);
-      if (removeListener) removeListener();
+    let disposed = false;
+    let timer;
+    const refresh = async (refreshMetadata = false) => {
+      clearTimeout(timer);
+      if (disposed || document.hidden) return;
+      await fetchData({ refreshMetadata });
+      if (!disposed && !document.hidden) timer = setTimeout(() => refresh(), 10000);
     };
-  }, [dateRange, groupBy]); // 期間または集計単位が変更されたら再取得
+    const visibilityChanged = () => {
+      if (!isMiniMode) {
+        document.documentElement.classList.toggle('app-hidden', document.hidden);
+      }
+      clearTimeout(timer);
+      requestRef.current?.abort();
+      requestRef.current = null;
+      if (!document.hidden) refresh(true);
+    };
+    const ipcRenderer = window.require?.('electron').ipcRenderer;
+    const onSync = (event, arg) => {
+      if (arg?.type === 'sync') {
+        loaderRef.current.invalidate();
+        refresh(true);
+      }
+    };
+    document.addEventListener('visibilitychange', visibilityChanged);
+    ipcRenderer?.on('window-event:received', onSync);
+    visibilityChanged();
+    return () => {
+      disposed = true;
+      clearTimeout(timer);
+      requestRef.current?.abort();
+      requestRef.current = null;
+      document.removeEventListener('visibilitychange', visibilityChanged);
+      ipcRenderer?.removeListener('window-event:received', onSync);
+    };
+  }, [dateRange, groupBy, activeTab, isMiniMode]);
+
+  useEffect(() => {
+    document.documentElement.classList.toggle('power-saving', settings.power_saving !== 'false');
+  }, [settings.power_saving]);
+
+  const heatmapBySlot = useMemo(() => new Map(heatmapData.map(cell =>
+    [`${cell.logDate}:${Number(cell.hour)}:${Number(cell.minute)}`, cell]
+  )), [heatmapData]);
 
   const handleSaveSetting = async (key, value) => {
     let finalValue = value.toString();
@@ -1023,16 +955,11 @@ function App() {
                   </div>
 
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', flex: 1, justifyContent: 'center' }}>
-                    {/* 1行目: ステータス名とペット */}
-                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
+                    {/* 1行目: ステータス名 */}
+                    <div style={{ display: 'flex', alignItems: 'center', width: '100%' }}>
                       <span style={{ fontSize: '2rem', fontWeight: '800', color: fatigueData.pomodoro ? (fatigueData.pomodoro.phase === 'work' ? 'var(--primary)' : '#10b981') : (fatigueData.statusName === 'Critical' ? '#ef4444' : fatigueData.statusName === 'Strained' ? '#f97316' : 'var(--text)'), lineHeight: 1 }}>
                         {fatigueData.pomodoro ? (fatigueData.pomodoro.phase === 'work' ? 'WORKING' : 'BREAK') : (fatigueData.statusName === 'Initializing' ? 'Initializing . . .' : fatigueData.statusName)}
                       </span>
-                      {!fatigueData.pomodoro && (
-                        <div style={{ visibility: fatigueData.statusName === 'Initializing' ? 'hidden' : 'visible' }}>
-                          <PetIcon status={fatigueData.statusName} size={48} />
-                        </div>
-                      )}
                     </div>
 
                     {/* 2行目: 残り時間/稼働率 と 操作ボタン */}
@@ -1040,7 +967,7 @@ function App() {
                       {fatigueData.pomodoro ? (
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', width: '100%' }}>
                           <span style={{ fontSize: '1.7rem', fontWeight: '700', color: 'var(--text)' }}>
-                            残り {Math.floor((localRemainingSeconds ?? fatigueData.pomodoro.remainingSeconds) / 60)}:{((localRemainingSeconds ?? fatigueData.pomodoro.remainingSeconds) % 60).toString().padStart(2, '0')}
+                            <RemainingTime pomodoro={fatigueData.pomodoro} />
                           </span>
                           <div style={{ display: 'flex', gap: '0.75rem', width: '100%', marginTop: '0.5rem' }}>
                             {fatigueData.pomodoro.status === 'paused' ? (
@@ -1079,10 +1006,8 @@ function App() {
                     </div>
 
                     <div style={{ height: '8px', background: 'rgba(255, 255, 255, 0.05)', borderRadius: '4px', overflow: 'hidden' }}>
-                      <div style={{
+                      <ActivityProgress fatigue={fatigueData} style={{
                         height: '100%',
-                        width: calcProgressWidth(fatigueData, localRemainingSeconds),
-                        background: calcProgressGradient(fatigueData),
                         borderRadius: '4px',
                         transition: 'width 1s linear'
                       }} />
@@ -1121,7 +1046,7 @@ function App() {
                         lineHeight: '1.4',
                         whiteSpace: 'pre-line'
                       }}>
-                        {getFatigueAdvice(fatigueData.statusName, fatigueData.pomodoro, localRemainingSeconds)}
+                        {getFatigueAdvice(fatigueData.statusName, fatigueData.pomodoro)}
                       </div>
                     )}
                   </div>
@@ -1202,11 +1127,7 @@ function App() {
                     <React.Fragment key={`${h}:${m}`}>
                       <div className={`time-label sticky-left ${m === '00' ? 'is-hour-start' : ''}`}>{m === '00' ? `${h}:00` : `:${m}`}</div>
                       {dates.map(date => {
-                        const cell = heatmapData.find(d =>
-                          d.logDate === date &&
-                          parseInt(d.hour) === h &&
-                          parseInt(d.minute) === parseInt(m)
-                        );
+                        const cell = heatmapBySlot.get(`${date}:${h}:${Number(m)}`);
                         const isIdle = cell && (cell.topApp === 'アイドル状態' || cell.topApp === '無操作');
                         const cellColor = cell?.color || settings.default_activity_color || 'var(--primary)';
                         const cellDuration = cell ? cell.count * parseInt(settings.sampling_interval || 10) : 0;
@@ -1546,6 +1467,12 @@ function App() {
                   </div>
 
 
+                  <label className="power-saving-setting">
+                    <input type="checkbox" checked={settings.power_saving !== 'false'}
+                      onChange={event => handleSaveSetting('power_saving', event.target.checked)} />
+                    <span>省電力表示（ぼかし効果を抑える）</span>
+                  </label>
+
                   <div style={{ marginBottom: '2rem', padding: '1.5rem', background: 'rgba(239, 68, 68, 0.05)', border: '1px solid rgba(239, 68, 68, 0.1)', borderRadius: '16px' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '1rem', color: '#f87171' }}>
                       <AlertTriangle size={20} />
@@ -1744,10 +1671,9 @@ function App() {
     }
   };
 
-  const isMiniMode = window.location.search.includes('mini=true');
-
   useEffect(() => {
     if (isMiniMode) {
+      document.documentElement.classList.add('mini-mode');
       document.body.style.background = 'transparent';
       document.body.style.borderRadius = '16px';
       document.body.style.overflow = 'hidden';
@@ -1810,7 +1736,7 @@ function App() {
               <span style={{ fontSize: '0.95rem', color: 'var(--mini-text-sub)' }}>
                 {fatigueData.pomodoro ? (
                   <span style={{ fontWeight: '700', color: 'var(--mini-text-heading)' }}>
-                    残り {Math.floor((localRemainingSeconds ?? fatigueData.pomodoro.remainingSeconds) / 60)}:{((localRemainingSeconds ?? fatigueData.pomodoro.remainingSeconds) % 60).toString().padStart(2, '0')}
+                    <RemainingTime pomodoro={fatigueData.pomodoro} />
                   </span>
                 ) : (
                   `(${fatigueData.statusName === 'Initializing' ? '集計中. . .' : `${100 - fatigueData.idleRate}%`})`
@@ -1832,10 +1758,8 @@ function App() {
           </div>
 
           <div style={{ height: '5px', background: 'var(--mini-bar-bg)', borderRadius: '2.5px', overflow: 'hidden' }}>
-            <div style={{
+            <ActivityProgress fatigue={fatigueData} style={{
               height: '100%',
-              width: calcProgressWidth(fatigueData, localRemainingSeconds),
-              background: calcProgressGradient(fatigueData),
               borderRadius: '2.5px',
               transition: 'width 1s linear'
             }} />
@@ -1905,7 +1829,7 @@ function App() {
             fontWeight: '500',
             whiteSpace: 'pre-line'
           }}>
-            {getFatigueAdvice(fatigueData.statusName, fatigueData.pomodoro, localRemainingSeconds)}
+            {getFatigueAdvice(fatigueData.statusName, fatigueData.pomodoro)}
           </div>
         )}
 
@@ -1941,7 +1865,7 @@ function App() {
           </div>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <span style={{ fontSize: '0.65rem', color: 'var(--mini-text-dim)' }}>
-              稼働: {Math.floor(fatigueData.activeLogs * 10 / 60)}分
+              稼働: {Math.floor(fatigueData.activeLogs * Number(settings.sampling_interval || 10) / 60)}分
             </span>
             <StatusDots isRecording={isRecording} idleSeconds={idleSeconds} />
           </div>

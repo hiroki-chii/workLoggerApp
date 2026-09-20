@@ -1003,6 +1003,29 @@ select option {
 }
 
 /* ペット用のアニメーション定義 */
+.app-hidden:not(.mini-mode) *, .app-hidden:not(.mini-mode) *::before, .app-hidden:not(.mini-mode) *::after {
+  animation-play-state: paused !important;
+}
+
+.mini-window-container [class^="pet-"],
+.mini-window-container [class*=" pet-"] {
+  animation-play-state: running !important;
+}
+
+.power-saving .mini-window-container,
+.power-saving .sidebar,
+.power-saving .card {
+  backdrop-filter: none !important;
+}
+
+.power-saving-setting {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin-bottom: 2rem;
+  cursor: pointer;
+}
+
 .pet-bounce {
   display: inline-block;
   animation: petBounce 1s ease-in-out infinite alternate;

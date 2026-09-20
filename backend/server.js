@@ -4,9 +4,12 @@ const Database = require('better-sqlite3');
 const path = require('path');
 const fs = require('fs');
 const { stringify } = require('csv-stringify');
+const { periodFilter, WORKDAY_FILTER } = require('./time-range');
+const { createActivityReader, pomodoroState } = require('./activity-state');
+const { startNotifications } = require('./notifications');
 
 const app = express();
-const PORT = 3001;
+const PORT = process.env.PORT === undefined ? 3001 : Number(process.env.PORT);
 const DB_PATH = process.env.DB_PATH || path.join(process.env.APPDATA, 'workloggerapp', 'logs.db');
 
 // Ensure database directory exists
@@ -49,6 +52,7 @@ try {
       windowTitle TEXT,
       timestamp DATETIME DEFAULT CURRENT_TIMESTAMP
     );
+    CREATE INDEX IF NOT EXISTS idx_logs_timestamp ON logs(timestamp);
     CREATE TABLE IF NOT EXISTS settings (
       key TEXT PRIMARY KEY,
       value TEXT
@@ -75,6 +79,7 @@ try {
   db.prepare('INSERT OR IGNORE INTO settings (key, value) VALUES (?, ?)').run('pomodoro_status', 'running');
   db.prepare('INSERT OR IGNORE INTO settings (key, value) VALUES (?, ?)').run('pomodoro_remaining_ms', '0');
   db.prepare('INSERT OR IGNORE INTO settings (key, value) VALUES (?, ?)').run('sliding_window_size', '90');
+  db.prepare('INSERT OR IGNORE INTO settings (key, value) VALUES (?, ?)').run('power_saving', 'true');
   // 既存データがある場合は「右上」を「右下」へ補正
   db.prepare("UPDATE settings SET value = '右下' WHERE key = 'mini_window_position' AND value = '右上'").run();
   console.log('[Server] Database initialized (Better-SQLite3, WAL mode) at: %s', DB_PATH);
@@ -84,7 +89,7 @@ try {
 
 // Logging middleware
 app.use((req, res, next) => {
-  console.log(`[Server] ${new Date().toISOString()} ${req.method} ${req.url}`);
+  if (process.env.WORKLOGGER_DEBUG === '1') console.log(`[Server] ${req.method} ${req.path}`);
   next();
 });
 
@@ -95,18 +100,12 @@ app.get('/api/stats', (req, res) => {
     const groupCol = (groupBy === 'windowTitle') ? 'windowTitle' : 'appName';
 
     let query = `SELECT ${groupCol} AS name, COUNT(*) AS count FROM logs`;
-    let params = [];
-
-    if (startDate && endDate) {
-      query += ` WHERE date(timestamp, 'localtime') BETWEEN ? AND ? `;
-      params.push(startDate, endDate);
-    } else {
-      query += ` WHERE date(timestamp, 'localtime', '-4 hours') = date('now', 'localtime', '-4 hours') `;
-    }
+    const { clause, params } = periodFilter(startDate, endDate);
+    query += clause;
 
     query += ` GROUP BY name ORDER BY count DESC `;
 
-    console.log(`[Server] Stats query: ${query} with params: ${params}`);
+    // The indexed range excludes unrelated history before aggregation.
 
     const stats = db.prepare(query).all(...params);
     res.json(stats);
@@ -120,14 +119,10 @@ app.get('/api/logs', (req, res) => {
   try {
     const { startDate, endDate } = req.query;
     let query = "SELECT id, appName, windowTitle, datetime(timestamp, 'localtime') as timestamp FROM logs";
-    let params = [];
+    const { clause, params } = periodFilter(startDate, endDate, false);
+    query += clause;
 
-    if (startDate && endDate) {
-      query += " WHERE date(timestamp, 'localtime') BETWEEN ? AND ? ";
-      params.push(startDate, endDate);
-    }
-
-    query += ' ORDER BY timestamp DESC LIMIT 1000';
+    query += ' ORDER BY logs.timestamp DESC LIMIT 1000';
     const logs = db.prepare(query).all(...params);
     res.json(logs);
   } catch (err) {
@@ -149,12 +144,16 @@ app.get('/api/logs/breakdown', (req, res) => {
     const query = `
       SELECT id, appName, windowTitle, datetime(timestamp, 'localtime') as timestamp 
       FROM logs
-      WHERE date(timestamp, 'localtime') = ?
-        AND strftime('%H', timestamp, 'localtime') = ?
-        AND (strftime('%M', timestamp, 'localtime') / 15) * 15 = ?
-      ORDER BY timestamp ASC
+      WHERE timestamp >= datetime(?, 'utc')
+        AND timestamp < datetime(?, '+15 minutes', 'utc')
+      ORDER BY logs.timestamp ASC
     `;
-    const logs = db.prepare(query).all(date, hStr, mStart);
+    periodFilter(date, date);
+    if (!/^\d{1,2}$/.test(String(hour)) || Number(hour) > 23 || ![0, 15, 30, 45].includes(mStart)) {
+      return res.status(400).json({ error: 'Invalid time slot' });
+    }
+    const start = `${date} ${hStr}:${String(mStart).padStart(2, '0')}:00`;
+    const logs = db.prepare(query).all(start, start);
     res.json(logs);
   } catch (err) {
     console.error('[Server] Breakdown error:', err);
@@ -172,118 +171,19 @@ app.delete('/api/logs/clear', (req, res) => {
   }
 });
 
+const readActivity = createActivityReader(db);
+const notifications = startNotifications(readActivity, message => {
+  if (process.connected) process.send({ type: 'alert', message });
+});
+
 app.get('/api/fatigue', (req, res) => {
-  try {
-    const settingsRows = db.prepare('SELECT * FROM settings').all();
-    const settings = settingsRows.reduce((acc, curr) => ({ ...acc, [curr.key]: curr.value }), {});
-    const currentMode = settings.current_mode || 'tracking';
-    const pomodoroStartMs = parseInt(settings.pomodoro_start_ms || Date.now());
-
-    const logInfo = db.prepare(`
-      SELECT 
-        MIN(timestamp) as startTime, 
-        COUNT(*) as activeLogs 
-      FROM logs 
-      WHERE date(timestamp, 'localtime', '-4 hours') = date('now', 'localtime', '-4 hours')
-    `).get();
-
-    // 共通の稼働データ
-    const samplingInterval = 11;
-    const nowMs = Date.now();
-    let startTimeISO = null;
-    let elapsedSeconds = 0;
-    let activeLogs = 0;
-
-    if (logInfo && logInfo.startTime && logInfo.activeLogs > 0) {
-      startTimeISO = logInfo.startTime.replace(' ', 'T') + 'Z';
-      const startMs = new Date(startTimeISO).getTime();
-      elapsedSeconds = Math.max(0, Math.floor((nowMs - startMs) / 1000));
-      activeLogs = logInfo.activeLogs;
-    }
-
-    // 稼働率計算 (トラッキングモードの時のみ)
-    let idleRatePercent = 0;
-    let fatigueLevel = 0;
-    let statusName = 'Initializing';
-
-    if (currentMode === 'tracking' && activeLogs > 0) {
-      const slidingWindowSize = parseInt(settings.sliding_window_size || '90');
-      const slidingWindowSeconds = slidingWindowSize * 60;
-      const windowActiveLogsObj = db.prepare(`
-        SELECT COUNT(*) as activeLogsInWindow
-        FROM logs
-        WHERE timestamp >= datetime('now', '-${slidingWindowSize} minutes')
-      `).get();
-
-      const activeLogsInWindow = windowActiveLogsObj ? windowActiveLogsObj.activeLogsInWindow : 0;
-      const expectedLogsInWindow = Math.max(1, Math.floor(slidingWindowSeconds / samplingInterval));
-      idleRatePercent = Math.max(0, Math.min(100, Math.round(((expectedLogsInWindow - activeLogsInWindow) / expectedLogsInWindow) * 100)));
-      fatigueLevel = Math.max(0, Math.min(100, 100 - idleRatePercent));
-
-      if (idleRatePercent >= 40) statusName = 'Restored';
-      else if (idleRatePercent >= 25) statusName = 'Calm';
-      else if (idleRatePercent >= 15) statusName = 'Focused';
-      else if (idleRatePercent >= 10) statusName = 'Strained';
-      else statusName = 'Critical';
-    } else if (activeLogs > 0) {
-      statusName = 'Active'; // ポモドーロ中のデフォルト表示用
-    }
-
-    // ポモドーロ情報の計算
-    let pomodoro = null;
-    if (currentMode && currentMode.startsWith('pomodoro')) {
-      const workMin = parseInt(currentMode.replace('pomodoro', ''));
-      const breakMin = workMin === 15 ? 3 : (workMin === 25 ? 5 : 10);
-      
-      const pomodoroStatus = db.prepare('SELECT value FROM settings WHERE key = ?').get('pomodoro_status').value || 'running';
-      const pomodoroPausedRemaining = parseInt(db.prepare('SELECT value FROM settings WHERE key = ?').get('pomodoro_remaining_ms').value || '0');
-
-      const cycleMs = (workMin + breakMin) * 60 * 1000;
-      const workMinMs = workMin * 60 * 1000;
-      let isWork = true;
-      let remainingMs = 0;
-
-      if (pomodoroStatus === 'paused') {
-        remainingMs = pomodoroPausedRemaining;
-        const currentCyclePos = (Date.now() - pomodoroStartMs) % cycleMs;
-        isWork = currentCyclePos < workMinMs;
-      } else {
-        const elapsedMs = Date.now() - pomodoroStartMs;
-        const currentCyclePos = elapsedMs % cycleMs;
-        isWork = currentCyclePos < workMinMs;
-        remainingMs = isWork ? (workMinMs - currentCyclePos) : (cycleMs - currentCyclePos);
-      }
-
-      pomodoro = {
-        mode: currentMode,
-        phase: isWork ? 'work' : 'break',
-        remainingSeconds: Math.ceil(remainingMs / 1000),
-        workMin,
-        breakMin,
-        status: pomodoroStatus
-      };
-    }
-
-    res.json({
-      fatigueLevel,
-      idleRate: idleRatePercent,
-      statusName,
-      startTime: startTimeISO,
-      elapsedSeconds,
-      activeLogs,
-      expectedLogs: Math.max(1, Math.floor(elapsedSeconds / samplingInterval)),
-      currentMode,
-      pomodoro
-    });
-  } catch (err) {
-    console.error('[Server] Fatigue error:', err);
-    res.status(500).json({ error: err.message });
-  }
+  try { res.json(readActivity().fatigue); }
+  catch (err) { res.status(500).json({ error: err.message }); }
 });
 
 app.post('/api/fatigue/reset', (req, res) => {
   try {
-    db.prepare("DELETE FROM logs WHERE date(timestamp, 'localtime', '-4 hours') = date('now', 'localtime', '-4 hours')").run();
+    db.prepare(`DELETE FROM logs WHERE ${WORKDAY_FILTER}`).run();
     res.json({ success: true });
   } catch (err) {
     console.error('[Server] Reset fatigue error:', err);
@@ -293,8 +193,8 @@ app.post('/api/fatigue/reset', (req, res) => {
 
 app.get('/api/debug-db', (req, res) => {
   try {
-    const logs = db.prepare("SELECT timestamp FROM logs ORDER BY timestamp DESC LIMIT 20").all();
-    const matchCount = db.prepare("SELECT COUNT(*) as c FROM logs WHERE date(timestamp, 'localtime', '-4 hours') = date('now', 'localtime', '-4 hours')").get().c;
+    const logs = db.prepare("SELECT timestamp FROM logs ORDER BY logs.timestamp DESC LIMIT 20").all();
+    const matchCount = db.prepare(`SELECT COUNT(*) as c FROM logs WHERE ${WORKDAY_FILTER}`).get().c;
     res.json({ logs, matchCount });
   } catch (err) {
     res.json({ error: err.message });
@@ -305,48 +205,32 @@ app.get('/api/debug-db', (req, res) => {
 app.post('/api/pomodoro/control', (req, res) => {
   try {
     const { action } = req.body;
-    const currentMode = db.prepare('SELECT value FROM settings WHERE key = ?').get('current_mode').value;
-    if (!currentMode.startsWith('pomodoro')) {
-      return res.status(400).json({ error: 'Not in Pomodoro mode' });
-    }
-
-    const workMin = parseInt(currentMode.replace('pomodoro', ''));
-    const breakMin = workMin === 15 ? 3 : (workMin === 25 ? 5 : 10);
-    const cycleMs = (workMin + breakMin) * 60 * 1000;
-    const workMinMs = workMin * 60 * 1000;
-
-    const pomodoroStartMs = parseInt(db.prepare('SELECT value FROM settings WHERE key = ?').get('pomodoro_start_ms').value);
-    const elapsedMs = Date.now() - pomodoroStartMs;
-    const currentCyclePos = elapsedMs % cycleMs;
-    const isWork = currentCyclePos < workMinMs;
-    const currentRemainingMs = isWork ? (workMinMs - currentCyclePos) : (cycleMs - currentCyclePos);
-
-    if (action === 'pause') {
-      db.prepare('INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)').run('pomodoro_status', 'paused');
-      db.prepare('INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)').run('pomodoro_remaining_ms', currentRemainingMs.toString());
-    } else if (action === 'start') {
-      const pomodoroStatus = db.prepare('SELECT value FROM settings WHERE key = ?').get('pomodoro_status').value;
-      if (pomodoroStatus === 'paused') {
-        const pausedRemainingMs = parseInt(db.prepare('SELECT value FROM settings WHERE key = ?').get('pomodoro_remaining_ms').value);
-        // 新しい開始時刻を計算（サイクル位置を維持するように）
-        // サイクル内位置 = (isWork ? workMinMs : cycleMs) - pausedRemainingMs
-        // newStartMs = now - サイクル内位置
-        const newCyclePos = (isWork ? workMinMs : cycleMs) - pausedRemainingMs;
-        const newStartMs = Date.now() - newCyclePos;
-        db.prepare('INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)').run('pomodoro_start_ms', newStartMs.toString());
+    if (!['pause', 'start', 'reset'].includes(action)) return res.status(400).json({ error: 'Invalid action' });
+    db.transaction(() => {
+      const settings = Object.fromEntries(db.prepare('SELECT key, value FROM settings').all().map(row => [row.key, row.value]));
+      const now = Date.now();
+      const state = pomodoroState(settings, now);
+      if (!state) throw new Error('Not in Pomodoro mode');
+      const save = db.prepare('INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)');
+      if (action === 'pause' && state.status === 'running') {
+        save.run('pomodoro_status', 'paused');
+        save.run('pomodoro_remaining_ms', String(Math.max(0, state.deadlineMs - now)));
+        save.run('pomodoro_paused_phase', state.phase);
+      } else if (action === 'start' && state.status === 'paused') {
+        const end = (state.phase === 'work' ? state.workMin : state.workMin + state.breakMin) * 60000;
+        save.run('pomodoro_start_ms', String(now - end + Number(settings.pomodoro_remaining_ms || 0)));
+        save.run('pomodoro_status', 'running');
+      } else if (action === 'reset') {
+        save.run('pomodoro_start_ms', String(now));
+        save.run('pomodoro_status', 'paused');
+        save.run('pomodoro_remaining_ms', String(state.workMin * 60000));
+        save.run('pomodoro_paused_phase', 'work');
       }
-      db.prepare('INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)').run('pomodoro_status', 'running');
-    } else if (action === 'reset') {
-      const workMinMs = workMin * 60 * 1000;
-      db.prepare('INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)').run('pomodoro_start_ms', Date.now().toString());
-      db.prepare('INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)').run('pomodoro_status', 'paused');
-      db.prepare('INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)').run('pomodoro_remaining_ms', workMinMs.toString());
-    }
-
+    })();
+    notifications.refresh();
     res.json({ success: true });
   } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: err.message });
+    res.status(400).json({ error: err.message });
   }
 });
 
@@ -362,8 +246,19 @@ app.get('/api/settings', (req, res) => {
 
 app.post('/api/settings', (req, res) => {
   try {
-    const { key, value } = req.body;
-    db.prepare('INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)').run(key, value.toString());
+    const values = req.body.settings || { [req.body.key]: req.body.value };
+    const entries = Object.entries(values);
+    if (!entries.length || entries.some(([key, value]) => key === 'undefined' || value == null)) {
+      return res.status(400).json({ error: 'Invalid settings' });
+    }
+    if (values.sampling_interval != null && (!Number.isInteger(Number(values.sampling_interval)) || Number(values.sampling_interval) < 1)) {
+      return res.status(400).json({ error: 'Invalid sampling interval' });
+    }
+    db.transaction(() => {
+      const save = db.prepare('INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)');
+      for (const [key, value] of entries) save.run(key, String(value));
+    })();
+    notifications.refresh();
     res.json({ success: true });
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -455,14 +350,10 @@ app.get('/api/export', (req, res) => {
   try {
     const { startDate, endDate } = req.query;
     let query = "SELECT datetime(timestamp, 'localtime') as timestamp, appName, windowTitle FROM logs";
-    let params = [];
+    const { clause, params } = periodFilter(startDate, endDate, false);
+    query += clause;
 
-    if (startDate && endDate) {
-      query += " WHERE date(timestamp, 'localtime') BETWEEN ? AND ? ";
-      params.push(startDate, endDate);
-    }
-
-    query += ' ORDER BY timestamp DESC';
+    query += ' ORDER BY logs.timestamp DESC';
     const logs = db.prepare(query).all(...params);
 
     // ウィンドウ置換ルールを取得して適用
@@ -492,14 +383,7 @@ app.get('/api/export/timetable', (req, res) => {
   try {
     const { startDate, endDate } = req.query;
 
-    let whereClause = "";
-    let params = [];
-    if (startDate && endDate) {
-      whereClause = ` WHERE date(timestamp, 'localtime') BETWEEN ? AND ? `;
-      params.push(startDate, endDate);
-    } else {
-      whereClause = ` WHERE date(timestamp, 'localtime', '-4 hours') = date('now', 'localtime', '-4 hours') `;
-    }
+    const { clause: whereClause, params } = periodFilter(startDate, endDate);
 
     // ヒートマップと同じクエリでデータを取得
     const query = `
@@ -542,15 +426,12 @@ app.get('/api/export/timetable', (req, res) => {
       }
     }
 
+    const cells = new Map(data.map(d => [`${d.logDate}:${Number(d.hour)}:${Number(d.minute)}`, d]));
     // CSV用の配列を作成
     const csvData = intervals.map(({ h, m }) => {
       const row = { time: `${h.toString().padStart(2, '0')}:${m}` };
       dates.forEach(date => {
-        const cell = data.find(d => 
-          d.logDate === date && 
-          parseInt(d.hour) === h && 
-          parseInt(d.minute) === parseInt(m)
-        );
+        const cell = cells.get(`${date}:${h}:${Number(m)}`);
         let displayVal = '';
         if (cell) {
           if (cell.topWindow) {
@@ -586,14 +467,7 @@ app.get('/api/heatmap', (req, res) => {
   try {
     const { startDate, endDate } = req.query;
 
-    let whereClause = "";
-    let params = [];
-    if (startDate && endDate) {
-      whereClause = ` WHERE date(timestamp, 'localtime') BETWEEN ? AND ? `;
-      params.push(startDate, endDate);
-    } else {
-      whereClause = ` WHERE date(timestamp, 'localtime', '-4 hours') = date('now', 'localtime', '-4 hours') `;
-    }
+    const { clause: whereClause, params } = periodFilter(startDate, endDate);
 
     // 各(時間枠, アプリ, ウィンドウ)の組み合わせでカウントし、時間枠ごとに最大のものを抽出
     const query = `
@@ -630,7 +504,18 @@ app.get('/api/heatmap', (req, res) => {
   }
 });
 
-app.listen(PORT, '127.0.0.1', () => {
-  console.log(`[Server] ゆとリズム API listening on http://127.0.0.1:${PORT}`);
+const server = app.listen(PORT, '127.0.0.1', () => {
+  const port = server.address().port;
+  console.log(`[Server] ゆとリズム API listening on http://127.0.0.1:${port}`);
+  if (process.connected) process.send({ type: 'ready', port });
 });
+function shutdown() {
+  notifications.stop();
+  server.close(() => { db.close(); process.exit(0); });
+}
+process.on('message', message => {
+  if (message?.type === 'shutdown') shutdown();
+  if (message?.type === 'resume') notifications.refresh();
+});
+process.on('disconnect', shutdown);
 

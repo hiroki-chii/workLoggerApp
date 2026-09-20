@@ -1,3 +1,26 @@
+## 2026-09-20 12:54
+- ミニ画面アニメーション有効化および軽量化リファクタリングの変更内容を GitHub へコミット＆プッシュ（コミットメッセージ: 「ミニ画面のアニメーション有効化およびパフォーマンス軽量化リファクタリング」）。
+
+## 2026-09-20 12:39
+- ミニ画面アニメーション有効化の修正を反映したEXEファイル（インストーラーおよびポータブル版）の再ビルドを完了。
+  - 成果物：`dist-pulse/ゆとリズム Setup 1.0.0.exe`（NSISインストーラー版）
+  - 成果物：`dist-pulse/ゆとリズム 1.0.0.exe`（ポータブル版）
+  - `npm run build` を実行し、フロントエンドバンドル生成および electron-builder によるパッケージングが正常完了したことを確認。
+
+## 2026-09-20 12:34
+- ミニ画面アニメーション有効化に伴う変更対象ファイル一覧の共有。
+  - 対象ファイル：`electron-core/main.js`, `frontend/src/App.css`, `frontend/src/App.jsx` および再ビルド成果物 `frontend/dist/`。
+
+## 2026-09-20 12:24
+- ミニ画面のアニメーションが動かない不具合を修正し、常時有効化。
+  - 原因1：`electron-core/main.js` でミニ画面 (`miniWindow`) に `backgroundThrottling: false` が指定されておらず、他アプリ操作中（非アクティブ時）にChromiumのスロットリングによってアニメーションが停止していた。
+  - 原因2：`frontend/src/App.css` の `@media (prefers-reduced-motion: reduce)` により、OSのアクセシビリティ設定（アニメーション効果オフ）等でペットアニメーションが強制停止されていた。
+  - 原因3：`frontend/src/App.css` の `.app-hidden` 指定により、ミニ画面でも意図せずアニメーション一時停止（`paused`）が適用されていた。
+  - 対策：`electron-core/main.js` の `createMiniWindow` に `backgroundThrottling: false` を設定。
+  - 対策：`frontend/src/App.css` から `prefers-reduced-motion` による強制停止を削除し、`.mini-window-container` 配下のペットアニメーションが常時再生（`running !important`）されるよう保証。
+  - 対策：`frontend/src/App.jsx` でミニ画面起動時に `mini-mode` クラスを付与し、非アクティブ・非表示判定（`app-hidden`）から除外。
+  - 対策：フロントエンドの再ビルド（`npm run build:frontend`）を実施し、dist成果物を更新。
+
 ## 2026-06-28 12:12
 - 開発起動スクリプトの接続待ち（IPv6/IPv4競合）によるフリーズ問題を修正。
   - 原因：Vite開発サーバーがデフォルトでIPv6の `[::1]:5173` のみで起動していたのに対し、`package.json` 内の `wait-on` が IPv4 の `localhost` (127.0.0.1) を見に行っていたため、Electronの自動起動プロセスが接続待ち（wait-on）で無限に待機し、サーバー (`server.js`) も起動していなかった。
