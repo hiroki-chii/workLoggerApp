@@ -1,0 +1,47 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "ゆとリズム",
+  "version": "1.0.0",
+  "identifier": "com.workloggerapp.app",
+  "build": {
+    "beforeDevCommand": "npm run dev --prefix frontend",
+    "beforeBuildCommand": "npm run build --prefix frontend",
+    "devUrl": "http://127.0.0.1:5173",
+    "frontendDist": "../frontend/dist"
+  },
+  "app": {
+    "windows": [
+      {
+        "label": "main",
+        "title": "ゆとリズム",
+        "width": 1100,
+        "height": 850,
+        "visible": true,
+        "resizable": true
+      },
+      {
+        "label": "mini",
+        "title": "ゆとリズム",
+        "url": "index.html?mini=true",
+        "width": 240,
+        "height": 160,
+        "visible": false,
+        "resizable": false,
+        "decorations": false,
+        "transparent": true,
+        "alwaysOnTop": true,
+        "skipTaskbar": true,
+        "shadow": false
+      }
+    ],
+    "security": {
+      "csp": null
+    }
+  },
+  "bundle": {
+    "targets": ["nsis"],
+    "resources": {
+      "resources/monitor.ps1": "monitor.ps1"
+    }
+  }
+}

@@ -43,14 +43,12 @@ import {
   getStatusTextColor,
   getStatusTheme,
   calcProgressWidth,
-  calcProgressGradient,
-  invokeIpc,
-  sendIpc
+  calcProgressGradient
 } from './utils/helpers';
+import { desktopApi } from './infrastructure/desktop';
 
 ChartJS.register(ArcElement, Tooltip, Legend);
 
-const API_BASE = 'http://127.0.0.1:3001/api';
 const DB_NAME = 'logs.db';
 const APP_DIR_NAME = 'workloggerapp';
 
@@ -254,11 +252,7 @@ function App() {
   const isMiniMode = window.location.search.includes('mini=true');
   const requestRef = useRef(null);
   const loaderRef = useRef(null);
-  if (!loaderRef.current) loaderRef.current = createScreenLoader(async (path, signal) => {
-    const response = await fetch(API_BASE + path, { signal });
-    if (!response.ok) throw new Error(`HTTP ${response.status}`);
-    return response.json();
-  });
+  if (!loaderRef.current) loaderRef.current = createScreenLoader(desktopApi);
   const [stats, setStats] = useState([]);
   const [totalAppsCount, setTotalAppsCount] = useState(0);
   const [totalWindowsCount, setTotalWindowsCount] = useState(0);
@@ -316,13 +310,13 @@ function App() {
     requestRef.current = controller;
     const timeout = setTimeout(() => controller.abort(), 15000);
     try {
-      const params = new URLSearchParams({
+      const range = {
         startDate: dateRange.start,
         endDate: dateRange.end
-      }).toString();
+      };
 
       const data = await loaderRef.current.load({
-        mini: isMiniMode, tab: activeTab, params, signal: controller.signal
+        mini: isMiniMode, tab: activeTab, range, signal: controller.signal
       });
       if (controller.signal.aborted) return;
       const { statsApps: statsAppsData, statsWindows: statsWindowsData, logs: logsData,
@@ -425,24 +419,22 @@ function App() {
 
   const checkRecordingStatus = async () => {
     try {
-      const status = await invokeIpc('recording:status');
-      if (status !== null) setIsRecording(status);
+      setIsRecording(await desktopApi.getRecordingStatus());
     } catch (err) {
       console.error('記録状態の取得に失敗しました:', err);
     }
   };
 
   const toggleRecording = async () => {
-    const channel = isRecording ? 'recording:stop' : 'recording:start';
-    const status = await invokeIpc(channel);
-    if (status !== null) {
-      setIsRecording(status);
-      // 記録開始時はデータを即時リフレッシュ
-      if (status) {
-        setTimeout(fetchData, 1000);
-      }
-      sendIpc('window-event:notify', { type: 'sync' });
+    const status = isRecording
+      ? await desktopApi.stopRecording()
+      : await desktopApi.startRecording();
+    setIsRecording(status);
+    // 記録開始時はデータを即時リフレッシュ
+    if (status) {
+      setTimeout(fetchData, 1000);
     }
+    desktopApi.notifyAppChanged();
   };
 
   const handleModeChange = async (newMode) => {
@@ -450,11 +442,11 @@ function App() {
     if (newMode.startsWith('pomodoro') && fatigueData.currentMode === 'tracking' && fatigueData.statusName === 'Critical') {
       const message = "現在、疲労状態が『Critical』です。\nポモドーロモードで作業を再開する前に、まずは十分な休憩を取ることを強くお勧めします。\nこのまま切り替えますか？";
 
-      const confirmed = await invokeIpc('alert:confirm', {
+      const confirmed = await desktopApi.confirm({
         title: '休憩のおすすめ',
         message
       });
-      // Electron環境: confirmed が false なら中断 / ブラウザ環境: window.confirm にフォールバック
+      // Desktop adapter が確認 UI を提供しない場合は、ブラウザ確認にフォールバックする。
       if (confirmed === false) return;
       if (confirmed === null && !window.confirm(message)) return;
     }
@@ -467,17 +459,13 @@ function App() {
         initialRemainingMs = (mins * 60 * 1000).toString();
       }
 
-      const response = await fetch(`${API_BASE}/settings`, {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ settings: {
-          current_mode: newMode, pomodoro_start_ms: now,
-          pomodoro_status: newMode === 'tracking' ? 'running' : 'paused',
-          pomodoro_remaining_ms: initialRemainingMs, pomodoro_paused_phase: 'work'
-        } })
+      await desktopApi.updateSettings({
+        current_mode: newMode, pomodoro_start_ms: now,
+        pomodoro_status: newMode === 'tracking' ? 'running' : 'paused',
+        pomodoro_remaining_ms: initialRemainingMs, pomodoro_paused_phase: 'work'
       });
-      if (!response.ok) throw new Error('設定を保存できませんでした');
       fetchData();
-      sendIpc('window-event:notify', { type: 'sync' });
+      desktopApi.notifyAppChanged();
     } catch (err) {
       console.error('Mode change error:', err);
     }
@@ -485,13 +473,9 @@ function App() {
 
   const handlePomodoroControl = async (action) => {
     try {
-      await fetch(`${API_BASE}/pomodoro/control`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action })
-      });
+      await desktopApi.controlPomodoro(action);
       fetchData();
-      sendIpc('window-event:notify', { type: 'sync' });
+      desktopApi.notifyAppChanged();
     } catch (err) {
       console.error('Pomodoro control error:', err);
     }
@@ -544,15 +528,11 @@ function App() {
       requestRef.current = null;
       if (!document.hidden) refresh(true);
     };
-    const ipcRenderer = window.require?.('electron').ipcRenderer;
-    const onSync = (event, arg) => {
-      if (arg?.type === 'sync') {
-        loaderRef.current.invalidate();
-        refresh(true);
-      }
-    };
+    const unsubscribe = desktopApi.onAppChanged(() => {
+      loaderRef.current.invalidate();
+      refresh(true);
+    });
     document.addEventListener('visibilitychange', visibilityChanged);
-    ipcRenderer?.on('window-event:received', onSync);
     visibilityChanged();
     return () => {
       disposed = true;
@@ -560,7 +540,7 @@ function App() {
       requestRef.current?.abort();
       requestRef.current = null;
       document.removeEventListener('visibilitychange', visibilityChanged);
-      ipcRenderer?.removeListener('window-event:received', onSync);
+      unsubscribe();
     };
   }, [dateRange, groupBy, activeTab, isMiniMode]);
 
@@ -576,13 +556,9 @@ function App() {
     let finalValue = value.toString();
 
     try {
-      await fetch(`${API_BASE}/settings`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ key, value: finalValue })
-      });
+      await desktopApi.updateSettings({ [key]: finalValue });
       setSettings(prev => ({ ...prev, [key]: finalValue }));
-      sendIpc('window-event:notify', { type: 'sync' });
+      desktopApi.notifyAppChanged();
     } catch (err) {
       console.error('設定の保存に失敗しました:', err);
     }
@@ -594,46 +570,46 @@ function App() {
     }
 
     try {
-      const res = await fetch(`${API_BASE}/logs/clear`, { method: 'DELETE' });
-      if (res.ok) {
-        alert('ログをすべて削除しました。');
-        fetchData(); // データをリフレッシュ
-        sendIpc('window-event:notify', { type: 'sync' });
-      }
+      await desktopApi.clearActivityHistory();
+      alert('ログをすべて削除しました。');
+      fetchData(); // データをリフレッシュ
+      desktopApi.notifyAppChanged();
     } catch (err) {
       console.error('ログの削除に失敗しました:', err);
       alert('削除に失敗しました。');
     }
   };
 
-  const handleExportCsv = (mode) => {
-    let url = `${API_BASE}/export`;
-    if (mode === 'range') {
-      url += `?startDate=${exportRange.start}&endDate=${exportRange.end}`;
-    }
-
-    // Create a temporary link to trigger download
+  const triggerDownload = (url, filename) => {
     const link = document.createElement('a');
     link.href = url;
-    link.setAttribute('download', 'work_logs.csv');
+    link.setAttribute('download', filename);
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
+  };
+
+  const handleExportCsv = async (mode) => {
+    const range = mode === 'range'
+      ? { startDate: exportRange.start, endDate: exportRange.end }
+      : undefined;
+    try {
+      triggerDownload(await desktopApi.getHistoryExportUrl(range), 'work_logs.csv');
+    } catch (err) {
+      console.error('履歴 CSV の出力に失敗しました:', err);
+    }
     setIsExportModalOpen(false);
   };
 
-  const handleExportTimetable = (mode) => {
-    let url = `${API_BASE}/export/timetable`;
-    if (mode === 'range') {
-      url += `?startDate=${exportRange.start}&endDate=${exportRange.end}`;
+  const handleExportTimetable = async (mode) => {
+    const range = mode === 'range'
+      ? { startDate: exportRange.start, endDate: exportRange.end }
+      : undefined;
+    try {
+      triggerDownload(await desktopApi.getTimetableExportUrl(range), 'work_timetable.csv');
+    } catch (err) {
+      console.error('タイムテーブル CSV の出力に失敗しました:', err);
     }
-
-    const link = document.createElement('a');
-    link.href = url;
-    link.setAttribute('download', 'work_timetable.csv');
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
     setIsExportModalOpen(false);
   };
 
@@ -645,12 +621,9 @@ function App() {
     setBreakdownLogs([]); // Reset previous logs
 
     try {
-      const res = await fetch(`${API_BASE}/logs/breakdown?date=${date}&hour=${hour}&minute=${minute}`);
-      if (res.ok) {
-        const data = await res.json();
-        const processedData = data.map(log => ({ ...log, ...applyWindowRules(log.windowTitle, windowRules) }));
-        setBreakdownLogs(processedData);
-      }
+      const data = await desktopApi.getActivityBreakdown({ date, hour, minute });
+      const processedData = data.map(log => ({ ...log, ...applyWindowRules(log.windowTitle, windowRules) }));
+      setBreakdownLogs(processedData);
     } catch (err) {
       console.error('内訳の取得に失敗しました:', err);
     }
@@ -884,13 +857,11 @@ function App() {
 
                 <div className="card" style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
                   <div className="card-title" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.5rem', marginBottom: 0 }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                      <Logo size={20} />
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap', minWidth: 0 }}>
                       <select
                         value={fatigueData.currentMode}
                         onChange={(e) => handleModeChange(e.target.value)}
                         style={{
-                          marginLeft: '0.5rem',
                           padding: '0.2rem 0.4rem',
                           fontSize: '1rem',
                           borderRadius: '6px',
@@ -907,7 +878,7 @@ function App() {
                         <option value="pomodoro50">ポモドーロ５０</option>
                       </select>
                       <button
-                        onClick={() => invokeIpc('mini-window:open')}
+                        onClick={() => desktopApi.showMiniWindow()}
                         style={{
                           padding: '0.3rem 0.6rem',
                           fontSize: '0.75rem',
@@ -923,9 +894,7 @@ function App() {
                         ミニ画面を表示
                       </button>
                     </div>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
-                      <StatusDots isRecording={isRecording} idleSeconds={idleSeconds} />
-                      <div style={{ display: 'flex', gap: '0.6rem', alignItems: 'center', flexWrap: 'wrap' }}>
+                    <div style={{ display: 'flex', gap: '0.6rem', alignItems: 'center', flexWrap: 'wrap' }}>
                         <label style={{ display: 'flex', alignItems: 'center', gap: '0.25rem', fontSize: '0.75rem', color: '#94a3b8', cursor: 'pointer' }}>
                           <input
                             type="checkbox"
@@ -933,7 +902,7 @@ function App() {
                             onChange={async (e) => {
                               const val = e.target.checked ? 'true' : 'false';
                               handleSaveSetting('show_mini_on_close', val);
-                              if (val === 'false') await invokeIpc('mini-window:close');
+                              if (val === 'false') await desktopApi.showMainWindow();
                             }}
                             style={{ width: '12px', height: '12px', accentColor: '#6366f1' }}
                           />
@@ -950,13 +919,12 @@ function App() {
                             <span>疲労アラート</span>
                           </label>
                         )}
-                      </div>
                     </div>
                   </div>
 
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', flex: 1, justifyContent: 'center' }}>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', flex: 1 }}>
                     {/* 1行目: ステータス名 */}
-                    <div style={{ display: 'flex', alignItems: 'center', width: '100%' }}>
+                    <div style={{ display: 'flex', flex: 1, minHeight: '4rem', alignItems: 'center', justifyContent: 'center', width: '100%', textAlign: 'center' }}>
                       <span style={{ fontSize: '2rem', fontWeight: '800', color: fatigueData.pomodoro ? (fatigueData.pomodoro.phase === 'work' ? 'var(--primary)' : '#10b981') : (fatigueData.statusName === 'Critical' ? '#ef4444' : fatigueData.statusName === 'Strained' ? '#f97316' : 'var(--text)'), lineHeight: 1 }}>
                         {fatigueData.pomodoro ? (fatigueData.pomodoro.phase === 'work' ? 'WORKING' : 'BREAK') : (fatigueData.statusName === 'Initializing' ? 'Initializing . . .' : fatigueData.statusName)}
                       </span>
@@ -1049,6 +1017,10 @@ function App() {
                         {getFatigueAdvice(fatigueData.statusName, fatigueData.pomodoro)}
                       </div>
                     )}
+
+                    <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 'auto', paddingTop: '0.25rem' }}>
+                      <StatusDots isRecording={isRecording} idleSeconds={idleSeconds} />
+                    </div>
                   </div>
                 </div>
               </section>
@@ -1306,17 +1278,11 @@ function App() {
                           if (!keyword || !replace_with) return alert('キーワードと変更後の名前を入力してください');
 
                           try {
-                            const res = await fetch(`${API_BASE}/window-rules`, {
-                              method: 'POST',
-                              headers: { 'Content-Type': 'application/json' },
-                              body: JSON.stringify({ keyword, replace_with, match_type, color })
-                            });
-                            if (res.ok) {
-                              document.getElementById('newRuleKeyword').value = '';
-                              document.getElementById('newRuleReplace').value = '';
-                              fetchData(); // データをリロードして新しいルールを適用
-                              sendIpc('window-event:notify', { type: 'sync' });
-                            }
+                            await desktopApi.createWindowRule({ keyword, replace_with, match_type, color });
+                            document.getElementById('newRuleKeyword').value = '';
+                            document.getElementById('newRuleReplace').value = '';
+                            fetchData(); // データをリロードして新しいルールを適用
+                            desktopApi.notifyAppChanged();
                           } catch (err) {
                             console.error(err);
                           }
@@ -1339,16 +1305,10 @@ function App() {
                               } else if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
                                 if (!editForm.keyword || !editForm.replace_with) return alert('キーワードと変更後の名前を入力してください');
                                 try {
-                                  const res = await fetch(`${API_BASE}/window-rules/${rule.id}`, {
-                                    method: 'PUT',
-                                    headers: { 'Content-Type': 'application/json' },
-                                    body: JSON.stringify(editForm)
-                                  });
-                                  if (res.ok) {
-                                    setEditingRuleId(null);
-                                    fetchData();
-                                    sendIpc('window-event:notify', { type: 'sync' });
-                                  }
+                                  await desktopApi.updateWindowRule(rule.id, editForm);
+                                  setEditingRuleId(null);
+                                  fetchData();
+                                  desktopApi.notifyAppChanged();
                                 } catch (err) {
                                   console.error(err);
                                 }
@@ -1388,16 +1348,10 @@ function App() {
                                 onClick={async () => {
                                   if (!editForm.keyword || !editForm.replace_with) return alert('キーワードと変更後の名前を入力してください');
                                   try {
-                                    const res = await fetch(`${API_BASE}/window-rules/${rule.id}`, {
-                                      method: 'PUT',
-                                      headers: { 'Content-Type': 'application/json' },
-                                      body: JSON.stringify(editForm)
-                                    });
-                                    if (res.ok) {
-                                      setEditingRuleId(null);
-                                      fetchData();
-                                      sendIpc('window-event:notify', { type: 'sync' });
-                                    }
+                                    await desktopApi.updateWindowRule(rule.id, editForm);
+                                    setEditingRuleId(null);
+                                    fetchData();
+                                    desktopApi.notifyAppChanged();
                                   } catch (e) {
                                     console.error(e);
                                   }
@@ -1444,9 +1398,9 @@ function App() {
                               <button
                                 onClick={async () => {
                                   try {
-                                    await fetch(`${API_BASE}/window-rules/${rule.id}`, { method: 'DELETE' });
+                                    await desktopApi.deleteWindowRule(rule.id);
                                     fetchData();
-                                    sendIpc('window-event:notify', { type: 'sync' });
+                                    desktopApi.notifyAppChanged();
                                   } catch (e) { }
                                 }}
                                 style={{ background: 'none', border: 'none', color: '#f87171', cursor: 'pointer', padding: '0.4rem' }}
@@ -1485,9 +1439,9 @@ function App() {
                       <button
                         onClick={async () => {
                           if (window.confirm('今日の記録を消去し、作業開始時間をリセットしますか？')) {
-                            await fetch('http://127.0.0.1:3001/api/fatigue/reset', { method: 'POST' });
+                            await desktopApi.resetFatigue();
                             fetchData();
-                            sendIpc('window-event:notify', { type: 'sync' });
+                            desktopApi.notifyAppChanged();
                             alert('今日の記録と作業開始時間をリセットしました。');
                           }
                         }}
@@ -1710,7 +1664,7 @@ function App() {
           </div>
           <div style={{ display: 'flex', gap: '0.3rem', WebkitAppRegion: 'no-drag' }}>
             <button
-              onClick={() => invokeIpc('mini-window:close')}
+              onClick={() => desktopApi.showMainWindow()}
               style={{
                 background: 'var(--mini-btn-bg)',
                 border: '1px solid var(--mini-btn-border)',
@@ -1842,7 +1796,7 @@ function App() {
                 onChange={async (e) => {
                   const val = e.target.checked ? 'true' : 'false';
                   handleSaveSetting('show_mini_on_close', val);
-                  if (val === 'false') await invokeIpc('mini-window:close');
+                  if (val === 'false') await desktopApi.showMainWindow();
                 }}
                 style={{ width: '12px', height: '12px', accentColor: 'var(--primary)' }}
               />
@@ -1999,7 +1953,7 @@ function App() {
               <button
                 onClick={async () => {
                   if (window.confirm('アプリケーションを完全に終了しますか？\n（バックグラウンドでの記録も停止します）')) {
-                    await invokeIpc('app:quit-completely');
+                    await desktopApi.quitApplication();
                   }
                 }}
                 style={{

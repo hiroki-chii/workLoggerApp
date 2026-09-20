@@ -33,17 +33,17 @@
 
 ## 🛠️ 技術スタック
 
-- **Framework**: [Electron](https://www.electronjs.org/)
+- **Desktop**: [Tauri 2](https://v2.tauri.app/)
 - **Frontend**: React (Vite), Vanilla CSS, Lucide-React, Chart.js
-- **Backend**: Express
-- **Database**: SQLite3 (Better-SQLite3)
-- **OS Integration**: Windows PowerShell (Activity & Idle Detection)
+- **Application / Database**: Rust, SQLite (`rusqlite`)
+- **OS Integration**: Windows Win32 API（前面ウィンドウ・無操作時間）
 
 ## 🚀 セットアップ
 
 ### 必要条件
 - Node.js (v18以上推奨)
-- Windows OS (PowerShell を使用するため)
+- Rust stable と Windows 向け MSVC ビルドツール
+- Windows 10 / 11（WebView2 Runtime）
 
 ### インストール
 ```bash
@@ -62,7 +62,18 @@ npm run dev
 ```bash
 npm run build
 ```
-ビルドされたファイルは `dist-pulse` ディレクトリに出力されます。
+ビルドされた Windows 配布物は `src-tauri/target/release/bundle/` に出力されます。
+
+既存の Electron 版から更新しても、活動履歴と設定は `%APPDATA%\\workloggerapp\\logs.db` をそのまま利用します。インストーラーを実行する前に、Electron 版を完全に終了してください。
+
+### 検証
+
+```bash
+npm run test:tauri
+npm test
+```
+
+`npm test` は Rust の互換テストと Tauri adapter の command 契約を検証します。
 
 ## 📝 開発・構成
 

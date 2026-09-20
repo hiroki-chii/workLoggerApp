@@ -8,22 +8,21 @@ export function screenNeeds(mini, tab) {
   };
 }
 
-export function createScreenLoader(fetchJson) {
+export function createScreenLoader(desktopApi) {
   let cache = {};
   return {
     invalidate() { cache = {}; },
-    async load({ mini, tab, params, signal }) {
+    async load({ mini, tab, range, signal }) {
       const needs = screenNeeds(mini, tab);
-      const get = path => fetchJson(path, signal);
       const [settings, rules, titles, statsApps, statsWindows, logs, heatmap, fatigue, status] = await Promise.all([
-        cache.settings ?? get('/settings'),
-        needs.rules ? cache.rules ?? get('/window-rules') : [],
-        needs.titles ? cache.titles ?? get('/window-titles') : [],
-        needs.stats ? get(`/stats?${params}&groupBy=appName`) : [],
-        needs.stats ? get(`/stats?${params}&groupBy=windowTitle`) : [],
-        needs.logs ? get('/logs') : [],
-        needs.heatmap ? get(`/heatmap?${params}`) : [],
-        get('/fatigue'), get('/status')
+        cache.settings ?? desktopApi.getSettings(signal),
+        needs.rules ? cache.rules ?? desktopApi.getWindowRules(signal) : [],
+        needs.titles ? cache.titles ?? desktopApi.getWindowTitles(signal) : [],
+        needs.stats ? desktopApi.getActivityStatistics({ ...range, groupBy: 'appName', signal }) : [],
+        needs.stats ? desktopApi.getActivityStatistics({ ...range, groupBy: 'windowTitle', signal }) : [],
+        needs.logs ? desktopApi.getActivityHistory(signal) : [],
+        needs.heatmap ? desktopApi.getHeatmap({ ...range, signal }) : [],
+        desktopApi.getFatigue(signal), desktopApi.getStatus(signal)
       ]);
       if (signal.aborted) throw new DOMException('Aborted', 'AbortError');
       cache.settings = settings;
