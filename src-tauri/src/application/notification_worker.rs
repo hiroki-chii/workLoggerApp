@@ -8,7 +8,7 @@ use std::{
     time::{Duration, Instant, SystemTime, UNIX_EPOCH},
 };
 
-use tauri::AppHandle;
+use tauri::{AppHandle, Emitter};
 use tauri_plugin_notification::NotificationExt;
 
 use crate::{
@@ -45,12 +45,18 @@ impl NotificationWorker {
                     .and_then(|fatigue| {
                         let settings = database.settings()?;
                         for message in tracker.update(&fatigue, &settings) {
-                            let _ = app
-                                .notification()
+                            app.notification()
                                 .builder()
                                 .title("ゆとリズム")
-                                .body(message)
-                                .show();
+                                .body(message.clone())
+                                .show()
+                                .unwrap_or_else(|error| {
+                                    eprintln!(
+                                        "[Notification] failed to show notification: {error}"
+                                    );
+                                });
+                            let _ = crate::application::window_lifecycle::show_main(&app);
+                            let _ = app.emit_to("main", "fatigue-alert", &message);
                         }
                         Ok(next_delay(&fatigue))
                     })

@@ -281,6 +281,11 @@ function App() {
   const handleMiniDragStart = async (event) => {
     if (event.button !== 0 || !window.__TAURI_INTERNALS__) return;
 
+    const target = event.target;
+    if (target instanceof Element && target.closest('button, input, select, textarea, a, label, [role="button"], [data-no-drag]')) {
+      return;
+    }
+
     event.preventDefault();
     event.currentTarget.setPointerCapture(event.pointerId);
     miniDragRef.current = {
@@ -354,6 +359,7 @@ function App() {
     currentMode: 'tracking',
     pomodoro: null
   });
+  const [fatigueAlert, setFatigueAlert] = useState(null);
 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -628,6 +634,13 @@ function App() {
       unsubscribe();
     };
   }, [dateRange, groupBy, activeTab, isMiniMode]);
+
+  useEffect(() => {
+    if (isMiniMode) return undefined;
+    return desktopApi.onFatigueAlert((message) => {
+      setFatigueAlert(message || '長時間の作業お疲れ様です。そろそろ休憩を取りませんか？');
+    });
+  }, [isMiniMode]);
 
   useEffect(() => {
     document.documentElement.classList.toggle('power-saving', settings.power_saving !== 'false');
@@ -1745,17 +1758,19 @@ function App() {
         borderRadius: '16px',
         color: 'var(--mini-text)',
         boxSizing: 'border-box',
-        overflow: 'hidden'
-      }}>
+        overflow: 'hidden',
+        cursor: 'move',
+        touchAction: 'none'
+      }}
+        onPointerDown={handleMiniDragStart}
+        onPointerMove={handleMiniDragMove}
+        onPointerUp={handleMiniDragEnd}
+        onPointerCancel={handleMiniDragEnd}
+      >
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <div
             title="ドラッグして移動"
-            onPointerDown={handleMiniDragStart}
-            onPointerMove={handleMiniDragMove}
-            onPointerUp={handleMiniDragEnd}
-            onPointerCancel={handleMiniDragEnd}
-            onDoubleClick={(event) => event.preventDefault()}
-            style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', flex: 1, cursor: 'move', userSelect: 'none', touchAction: 'none' }}
+            style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', flex: 1, userSelect: 'none' }}
           >
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
               <span style={{ fontSize: '0.85rem', fontWeight: '700', color: 'var(--mini-text-heading)' }}>
@@ -2088,6 +2103,22 @@ function App() {
       <main className="main-content">
         {renderContent()}
       </main>
+
+      {fatigueAlert && (
+        <div className="modal-overlay" style={{ zIndex: 1200 }} role="alertdialog" aria-modal="true">
+          <div className="modal-content" onClick={event => event.stopPropagation()}>
+            <div className="modal-header">
+              <h3><AlertTriangle size={20} color="var(--danger)" /> 休憩のお知らせ</h3>
+            </div>
+            <p style={{ whiteSpace: 'pre-line', lineHeight: 1.7, marginBottom: '1.5rem' }}>
+              {fatigueAlert}
+            </p>
+            <button className="primary-btn" onClick={() => setFatigueAlert(null)}>
+              閉じる
+            </button>
+          </div>
+        </div>
+      )}
 
       {isExportModalOpen && (
         <div className="modal-overlay" onClick={() => setIsExportModalOpen(false)}>

@@ -21,6 +21,10 @@ export class UnavailableDesktopApi {
     return () => {};
   }
 
+  onFatigueAlert() {
+    return () => {};
+  }
+
   confirm() {
     return Promise.resolve(null);
   }
