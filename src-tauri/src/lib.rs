@@ -47,6 +47,8 @@ pub fn run() {
             interface::commands::notify_app_changed,
             interface::commands::show_mini_window,
             interface::commands::show_main_window,
+            interface::commands::get_mini_window_position,
+            interface::commands::move_mini_window,
             interface::commands::quit_application,
             interface::commands::get_activity_breakdown,
         ])

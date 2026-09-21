@@ -252,10 +252,93 @@ function App() {
   const isMiniMode = window.location.search.includes('mini=true');
   const requestRef = useRef(null);
   const loaderRef = useRef(null);
+  const miniDragRef = useRef(null);
+  const miniDragMoveRef = useRef(null);
+  const miniDragMoveScheduledRef = useRef(false);
   if (!loaderRef.current) loaderRef.current = createScreenLoader(desktopApi);
   const [stats, setStats] = useState([]);
   const [totalAppsCount, setTotalAppsCount] = useState(0);
   const [totalWindowsCount, setTotalWindowsCount] = useState(0);
+
+  const flushMiniDragMove = () => {
+    if (miniDragMoveScheduledRef.current) return;
+
+    miniDragMoveScheduledRef.current = true;
+    requestAnimationFrame(async () => {
+      miniDragMoveScheduledRef.current = false;
+      const move = miniDragMoveRef.current;
+      miniDragMoveRef.current = null;
+      if (!move) return;
+
+      try {
+        await desktopApi.moveMiniWindow(move.x, move.y);
+      } catch (error) {
+        console.error('ミニ画面を移動できませんでした', error);
+      }
+    });
+  };
+
+  const handleMiniDragStart = async (event) => {
+    if (event.button !== 0 || !window.__TAURI_INTERNALS__) return;
+
+    event.preventDefault();
+    event.currentTarget.setPointerCapture(event.pointerId);
+    miniDragRef.current = {
+      pointerId: event.pointerId,
+      offsetX: null,
+      offsetY: null,
+      latestX: event.screenX,
+      latestY: event.screenY,
+      ended: false
+    };
+
+    try {
+      const [x, y] = await desktopApi.getMiniWindowPosition();
+      const drag = miniDragRef.current;
+      if (!drag || drag.pointerId !== event.pointerId) return;
+
+      const scaleFactor = window.devicePixelRatio || 1;
+      drag.offsetX = event.screenX - x / scaleFactor;
+      drag.offsetY = event.screenY - y / scaleFactor;
+
+      // The first pointer move can arrive before the asynchronous position lookup.
+      // Apply the latest recorded location once the lookup finishes.
+      miniDragMoveRef.current = {
+        x: Math.round((drag.latestX - drag.offsetX) * scaleFactor),
+        y: Math.round((drag.latestY - drag.offsetY) * scaleFactor)
+      };
+      flushMiniDragMove();
+
+      if (drag.ended) miniDragRef.current = null;
+    } catch (error) {
+      miniDragRef.current = null;
+      console.error('ミニ画面の位置を取得できませんでした', error);
+    }
+  };
+
+  const handleMiniDragMove = (event) => {
+    const drag = miniDragRef.current;
+    if (!drag || drag.pointerId !== event.pointerId) return;
+
+    drag.latestX = event.screenX;
+    drag.latestY = event.screenY;
+    if (drag.offsetX === null || drag.offsetY === null) return;
+
+    const scaleFactor = window.devicePixelRatio || 1;
+    miniDragMoveRef.current = {
+      x: Math.round((event.screenX - drag.offsetX) * scaleFactor),
+      y: Math.round((event.screenY - drag.offsetY) * scaleFactor)
+    };
+    flushMiniDragMove();
+  };
+
+  const handleMiniDragEnd = (event) => {
+    handleMiniDragMove(event);
+    if (miniDragRef.current?.pointerId === event.pointerId) {
+      miniDragRef.current.ended = true;
+      if (miniDragRef.current.offsetX !== null) miniDragRef.current = null;
+    }
+  };
   const [heatmapData, setHeatmapData] = useState([]);
   const [logs, setLogs] = useState([]);
   const [settings, setSettings] = useState({ sampling_interval: '10', default_activity_color: '#6366f1' });
@@ -292,6 +375,8 @@ function App() {
   const [breakdownLogs, setBreakdownLogs] = useState([]);
   const [selectedSlot, setSelectedSlot] = useState(null);
   const [isBreakdownModalOpen, setIsBreakdownModalOpen] = useState(false);
+  const [breakdownLoading, setBreakdownLoading] = useState(false);
+  const [breakdownError, setBreakdownError] = useState(null);
   const [breakdownGroupBy, setBreakdownGroupBy] = useState('windowTitle'); // 'appName', 'windowTitle'
   const [windowRules, setWindowRules] = useState([]);
   const [editingRuleId, setEditingRuleId] = useState(null);
@@ -613,19 +698,28 @@ function App() {
     setIsExportModalOpen(false);
   };
 
-
-
   const handleCellClick = async (date, hour, minute) => {
-    setSelectedSlot({ date, hour, minute });
+    const normalizedHour = Number(hour);
+    const normalizedMinute = Number(minute);
+    setSelectedSlot({ date, hour: normalizedHour, minute: normalizedMinute });
     setIsBreakdownModalOpen(true);
     setBreakdownLogs([]); // Reset previous logs
+    setBreakdownError(null);
+    setBreakdownLoading(true);
 
     try {
-      const data = await desktopApi.getActivityBreakdown({ date, hour, minute });
+      const data = await desktopApi.getActivityBreakdown({
+        date,
+        hour: normalizedHour,
+        minute: normalizedMinute
+      });
       const processedData = data.map(log => ({ ...log, ...applyWindowRules(log.windowTitle, windowRules) }));
       setBreakdownLogs(processedData);
     } catch (err) {
       console.error('内訳の取得に失敗しました:', err);
+      setBreakdownError('ログの内訳を取得できませんでした。もう一度お試しください。');
+    } finally {
+      setBreakdownLoading(false);
     }
   };
 
@@ -1640,7 +1734,6 @@ function App() {
   if (isMiniMode) {
     return (
       <div className="mini-window-container fade-in" style={{
-        WebkitAppRegion: 'drag',
         height: '100vh',
         padding: '0.6rem 0.75rem',
         display: 'flex',
@@ -1655,7 +1748,15 @@ function App() {
         overflow: 'hidden'
       }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
+          <div
+            title="ドラッグして移動"
+            onPointerDown={handleMiniDragStart}
+            onPointerMove={handleMiniDragMove}
+            onPointerUp={handleMiniDragEnd}
+            onPointerCancel={handleMiniDragEnd}
+            onDoubleClick={(event) => event.preventDefault()}
+            style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', flex: 1, cursor: 'move', userSelect: 'none', touchAction: 'none' }}
+          >
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
               <span style={{ fontSize: '0.85rem', fontWeight: '700', color: 'var(--mini-text-heading)' }}>
                 {fatigueData.pomodoro ? 'ポモドーロ' : 'トラッキング'}
@@ -2054,7 +2155,9 @@ function App() {
                   ログの内訳
                 </h2>
                 <div style={{ fontSize: '0.85rem', color: '#94a3b8', marginTop: '0.2rem', display: 'flex', gap: '1rem', alignItems: 'center' }}>
-                  <span>{selectedSlot?.date} {selectedSlot?.hour}:{selectedSlot?.minute} (15分間)</span>
+                  <span>
+                    {selectedSlot?.date} {selectedSlot?.hour}:{String(selectedSlot?.minute).padStart(2, '0')} (15分間)
+                  </span>
                   {breakdownLogs.length > 0 && (
                     <span style={{ color: 'var(--primary)', fontWeight: '600' }}>
                       合計記録時間: {
@@ -2072,7 +2175,17 @@ function App() {
             </div>
 
             <div style={{ flex: 1, overflowY: 'auto', paddingRight: '0.5rem' }}>
-              {breakdownLogs.length > 0 ? (
+              {breakdownLoading ? (
+                <div style={{ padding: '3rem', textAlign: 'center', color: '#94a3b8' }}>
+                  <RefreshCw size={24} className="spin" style={{ marginBottom: '1rem' }} />
+                  <div>データを読み込み中...</div>
+                </div>
+              ) : breakdownError ? (
+                <div style={{ padding: '3rem', textAlign: 'center', color: '#fca5a5' }}>
+                  <AlertTriangle size={24} style={{ marginBottom: '1rem' }} />
+                  <div>{breakdownError}</div>
+                </div>
+              ) : breakdownLogs.length > 0 ? (
                 <>
                   <div style={{ marginBottom: '2rem', padding: '1rem', background: 'rgba(255,255,255,0.02)', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.05)' }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem', flexWrap: 'wrap', gap: '0.5rem' }}>
@@ -2147,8 +2260,7 @@ function App() {
                 </>
               ) : (
                 <div style={{ padding: '3rem', textAlign: 'center', color: '#94a3b8' }}>
-                  <RefreshCw size={24} className="spin" style={{ marginBottom: '1rem' }} />
-                  <div>データを読み込み中...</div>
+                  <div>この時間帯の記録はありません。</div>
                 </div>
               )}
             </div>

@@ -2,7 +2,7 @@ use std::collections::HashMap;
 
 use std::time::{SystemTime, UNIX_EPOCH};
 
-use tauri::{AppHandle, Emitter, State};
+use tauri::{AppHandle, Emitter, Manager, PhysicalPosition, State};
 
 use crate::{
     app_state::AppState,
@@ -209,6 +209,24 @@ pub fn show_mini_window(app: AppHandle) -> CommandResult<()> {
 #[tauri::command]
 pub fn show_main_window(app: AppHandle) -> CommandResult<()> {
     crate::application::window_lifecycle::show_main(&app).map_err(command_error)
+}
+
+#[tauri::command]
+pub fn get_mini_window_position(app: AppHandle) -> CommandResult<(i32, i32)> {
+    let mini = app
+        .get_webview_window("mini")
+        .ok_or_else(|| "ミニ画面が見つかりません".to_owned())?;
+    let position = mini.outer_position().map_err(command_error)?;
+    Ok((position.x, position.y))
+}
+
+#[tauri::command]
+pub fn move_mini_window(app: AppHandle, x: i32, y: i32) -> CommandResult<()> {
+    let mini = app
+        .get_webview_window("mini")
+        .ok_or_else(|| "ミニ画面が見つかりません".to_owned())?;
+    mini.set_position(PhysicalPosition::new(x, y))
+        .map_err(command_error)
 }
 
 #[tauri::command]

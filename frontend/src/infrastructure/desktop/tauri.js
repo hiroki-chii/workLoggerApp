@@ -41,6 +41,8 @@ export class TauriDesktopApi extends UnavailableDesktopApi {
   deleteWindowRule(id) { return invoke('delete_window_rule', { id }); }
   showMiniWindow() { return invoke('show_mini_window'); }
   showMainWindow() { return invoke('show_main_window'); }
+  getMiniWindowPosition() { return invoke('get_mini_window_position'); }
+  moveMiniWindow(x, y) { return invoke('move_mini_window', { x, y }); }
   quitApplication() { return invoke('quit_application'); }
   getActivityBreakdown({ date, hour, minute }) {
     return invoke('get_activity_breakdown', { date, hour, minute });
