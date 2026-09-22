@@ -8,7 +8,7 @@ use std::{
     time::{Duration, Instant, SystemTime, UNIX_EPOCH},
 };
 
-use tauri::{AppHandle, Emitter};
+use tauri::AppHandle;
 use tauri_plugin_notification::NotificationExt;
 
 use crate::{
@@ -55,8 +55,7 @@ impl NotificationWorker {
                                         "[Notification] failed to show notification: {error}"
                                     );
                                 });
-                            let _ = crate::application::window_lifecycle::show_main(&app);
-                            let _ = app.emit_to("main", "fatigue-alert", &message);
+                            show_windows_alert(&message);
                         }
                         Ok(next_delay(&fatigue))
                     })
@@ -119,6 +118,33 @@ impl NotificationTracker {
         messages
     }
 }
+
+#[cfg(windows)]
+fn show_windows_alert(message: &str) {
+    use windows_sys::Win32::UI::WindowsAndMessaging::{
+        MessageBoxW, MB_ICONWARNING, MB_OK, MB_SETFOREGROUND, MB_TOPMOST,
+    };
+
+    let message = message
+        .encode_utf16()
+        .chain(std::iter::once(0))
+        .collect::<Vec<_>>();
+    let title = "ゆとリズム"
+        .encode_utf16()
+        .chain(std::iter::once(0))
+        .collect::<Vec<_>>();
+    unsafe {
+        MessageBoxW(
+            std::ptr::null_mut(),
+            message.as_ptr(),
+            title.as_ptr(),
+            MB_OK | MB_ICONWARNING | MB_SETFOREGROUND | MB_TOPMOST,
+        );
+    }
+}
+
+#[cfg(not(windows))]
+fn show_windows_alert(_message: &str) {}
 
 fn next_delay(fatigue: &FatigueSnapshot) -> Duration {
     fatigue

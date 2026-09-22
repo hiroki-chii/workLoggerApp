@@ -359,7 +359,6 @@ function App() {
     currentMode: 'tracking',
     pomodoro: null
   });
-  const [fatigueAlert, setFatigueAlert] = useState(null);
 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -634,13 +633,6 @@ function App() {
       unsubscribe();
     };
   }, [dateRange, groupBy, activeTab, isMiniMode]);
-
-  useEffect(() => {
-    if (isMiniMode) return undefined;
-    return desktopApi.onFatigueAlert((message) => {
-      setFatigueAlert(message || '長時間の作業お疲れ様です。そろそろ休憩を取りませんか？');
-    });
-  }, [isMiniMode]);
 
   useEffect(() => {
     document.documentElement.classList.toggle('power-saving', settings.power_saving !== 'false');
@@ -1281,7 +1273,6 @@ function App() {
                   {/* スライディングウィンドウ設定セクション */}
                   <div style={{ marginBottom: '2rem', padding: '1.5rem', background: 'rgba(255,255,255,0.02)', borderRadius: '16px' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '1.5rem' }}>
-                      <Logo size={20} />
                       <div>
                         <div style={{ fontWeight: '600' }}>疲労状態の算出基準時間（スライディングウィンドウ）</div>
                         <div style={{ fontSize: '0.8rem', color: '#94a3b8' }}>リアルタイムの疲労状態を計算する際に、過去何分間の活動状況を基準にするかを選択します。</div>
@@ -1700,7 +1691,7 @@ function App() {
 
                 <section className="card fade-in" style={{ animationDelay: '0.3s', gridColumn: '1 / -1' }}>
                   <div className="card-title">
-                    <Logo size={20} /> 便利なヒント
+                    便利なヒント
                   </div>
                   <div className="tips-grid">
                     <div className="tip-item">
@@ -2103,22 +2094,6 @@ function App() {
       <main className="main-content">
         {renderContent()}
       </main>
-
-      {fatigueAlert && (
-        <div className="modal-overlay" style={{ zIndex: 1200 }} role="alertdialog" aria-modal="true">
-          <div className="modal-content" onClick={event => event.stopPropagation()}>
-            <div className="modal-header">
-              <h3><AlertTriangle size={20} color="var(--danger)" /> 休憩のお知らせ</h3>
-            </div>
-            <p style={{ whiteSpace: 'pre-line', lineHeight: 1.7, marginBottom: '1.5rem' }}>
-              {fatigueAlert}
-            </p>
-            <button className="primary-btn" onClick={() => setFatigueAlert(null)}>
-              閉じる
-            </button>
-          </div>
-        </div>
-      )}
 
       {isExportModalOpen && (
         <div className="modal-overlay" onClick={() => setIsExportModalOpen(false)}>

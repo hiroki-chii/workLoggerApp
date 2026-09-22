@@ -70,17 +70,4 @@ export class TauriDesktopApi extends UnavailableDesktopApi {
     };
   }
 
-  onFatigueAlert(listener) {
-    let disposed = false;
-    let unlisten;
-    listen('fatigue-alert', ({ payload }) => listener(payload))
-      .then((dispose) => {
-        if (disposed) dispose(); else unlisten = dispose;
-      })
-      .catch(() => {});
-    return () => {
-      disposed = true;
-      unlisten?.();
-    };
-  }
 }
