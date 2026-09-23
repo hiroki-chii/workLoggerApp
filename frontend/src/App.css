@@ -1018,14 +1018,6 @@ select option {
   backdrop-filter: none !important;
 }
 
-.power-saving-setting {
-  display: flex;
-  align-items: center;
-  gap: 0.75rem;
-  margin-bottom: 2rem;
-  cursor: pointer;
-}
-
 .pet-bounce {
   display: inline-block;
   animation: petBounce 1s ease-in-out infinite alternate;

@@ -64,7 +64,7 @@ npm run build
 ```
 ビルドされた Windows 配布物は `src-tauri/target/release/bundle/` に出力されます。
 
-既存の Electron 版から更新しても、活動履歴と設定は `%APPDATA%\\workloggerapp\\logs.db` をそのまま利用します。インストーラーを実行する前に、Electron 版を完全に終了してください。
+以前の Electron 版から移行する場合も、活動履歴と設定は `%APPDATA%\\workloggerapp\\logs.db` を引き継ぎます。インストール前に旧アプリを終了してください。
 
 ### 検証
 
@@ -77,7 +77,7 @@ npm test
 
 ## 📝 開発・構成
 
-詳細なシステム構成やデータベース設計については [specification.md](./specification.md) を参照してください。
+システム構成やデータベース設計は [Tauri 移行記録](./docs/tauri-migration/README.md) を参照してください。
 
 ---
 

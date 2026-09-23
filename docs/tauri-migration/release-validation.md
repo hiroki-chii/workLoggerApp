@@ -23,13 +23,10 @@
 
 Tauri 版と Electron 版はどちらも `%APPDATA%\\workloggerapp\\logs.db` を利用する。新規 DB の smoke test では `WORKLOGGER_DATA_DIR` を使い、実データを変更していない。
 
-## 配布前の手動確認
+## Tauri 環境での確認
 
-- 既存 Electron 版を終了し、Tauri インストーラーを実データのある Windows 環境へ導入する。
-- 既存の履歴、設定、ポモドーロ、ルール、mini window の位置を確認する。
-- Tray、二重起動、スリープ復帰、Critical/ポモドーロ通知を含めて通常の一日分を常駐させる。
-- アンインストール後も `%APPDATA%\\workloggerapp\\logs.db` が残り、再インストール時に読み込めることを確認する。
+- ユーザー報告により、現在の Tauri 環境での確認完了。
 
 ## Electron 削除の判断
 
-自動化済みの配布試験は完了したが、一日常駐と実データの手動確認はこの作業環境では代替できない。完了後に `electron-core/`、Express backend、Better-SQLite3、Electron 依存、旧テストを削除する。
+Tauri 環境での確認完了後、`electron-core/`、Express backend、Better-SQLite3、Electron 依存、Electron 専用テストを削除した。Tauri の緊急切替用 PowerShell helper は `src-tauri/resources/monitor.ps1` に残している。

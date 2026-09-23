@@ -1,10 +1,10 @@
-# ゆとリズム Tauri 移行の設計基準
+# ゆとリズム Tauri 移行記録
 
-このディレクトリは、Electron 版から Tauri 2 版へ段階的に移行するための仕様記録です。
+このディレクトリは、Electron 版から Tauri 2 版への移行判断、互換性条件、検証結果を残す記録です。Tauri 版への移行と Electron 実装の削除は完了しています。
 
-## 正とする設計
+## 現行の設計
 
-参照チャット「Electron → Tauri移行計画」で定義された次の方針を正とします。
+現在のアプリは次の構成です。
 
 - 対象は当面 Windows のみ、デスクトップ基盤は Tauri 2。
 - React + Vite の UI は維持し、表示とユーザー入力のみを責務とする。
@@ -16,15 +16,15 @@
 - 初期段階では既存 PowerShell を `ActivitySource` として再利用し、後から `windows` crate に置換する。
 - Close はウィンドウを隠して監視を続け、Tray の「終了」のみが監視停止とアプリ終了を行う。
 
-実装は [migration-plan.md](migration-plan.md) の Phase 順に進めます。各 Phase の前に、[current-architecture.md](current-architecture.md) と [feature-inventory.md](feature-inventory.md) の互換条件を確認してください。
+移行時点の比較資料として [current-architecture.md](current-architecture.md) と [feature-inventory.md](feature-inventory.md) を保管しています。これらは Electron 時代の基準を含む履歴資料です。
 
 ## 不変条件
 
-1. Electron 版は Tauri 版の互換性が確認できるまで動作可能に保つ。
+1. Electron 実装は Tauri 版の互換確認後に削除済み。過去のリリースからの DB 互換性は維持する。
 2. Tauri 移行と DB 再設計を同時に行わない。
 3. 現行仕様との差異を見つけた場合、設計を勝手に変えない。差異を記録し、既存挙動を保つ最小変更を選ぶ。
 4. 破壊的な DB 操作はコピーした DB を使う検証で先に確認する。
-5. 疲労・ポモドーロの既存出力は Golden Master としてテストで固定してから Rust 化する。
+5. 疲労・ポモドーロの既存出力は Golden Master として固定し、Rust 化後も互換性を確認する。
 
 ## 文書
 

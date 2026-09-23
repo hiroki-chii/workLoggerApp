@@ -51,7 +51,6 @@ CREATE TABLE window_rules (
 | `pomodoro_remaining_ms` | epoch milliseconds ではなく残り時間 milliseconds 文字列 |
 | `pomodoro_paused_phase` | `work` / `break` |
 | `sliding_window_size` | `90` 分 |
-| `power_saving` | `true` |
 
 ## Rust 側の DB ルール
 

@@ -125,8 +125,7 @@ mod tests {
     #[test]
     fn reuses_the_existing_monitor_for_multiple_samples() {
         let script = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-            .join("..")
-            .join("backend")
+            .join("resources")
             .join("monitor.ps1");
         let mut source = PowerShellActivitySource::start(&script).unwrap();
         let first = source.sample(Duration::from_secs(10)).unwrap();

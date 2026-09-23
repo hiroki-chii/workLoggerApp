@@ -170,7 +170,6 @@ impl Database {
             ("pomodoro_status", "running".to_owned()),
             ("pomodoro_remaining_ms", "0".to_owned()),
             ("sliding_window_size", "90".to_owned()),
-            ("power_saving", "true".to_owned()),
         ] {
             connection.execute(
                 "INSERT OR IGNORE INTO settings (key, value) VALUES (?, ?)",

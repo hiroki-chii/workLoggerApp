@@ -635,8 +635,8 @@ function App() {
   }, [dateRange, groupBy, activeTab, isMiniMode]);
 
   useEffect(() => {
-    document.documentElement.classList.toggle('power-saving', settings.power_saving !== 'false');
-  }, [settings.power_saving]);
+    document.documentElement.classList.add('power-saving');
+  }, []);
 
   const heatmapBySlot = useMemo(() => new Map(heatmapData.map(cell =>
     [`${cell.logDate}:${Number(cell.hour)}:${Number(cell.minute)}`, cell]
@@ -1517,13 +1517,6 @@ function App() {
                       )}
                     </div>
                   </div>
-
-
-                  <label className="power-saving-setting">
-                    <input type="checkbox" checked={settings.power_saving !== 'false'}
-                      onChange={event => handleSaveSetting('power_saving', event.target.checked)} />
-                    <span>省電力表示（ぼかし効果を抑える）</span>
-                  </label>
 
                   <div style={{ marginBottom: '2rem', padding: '1.5rem', background: 'rgba(239, 68, 68, 0.05)', border: '1px solid rgba(239, 68, 68, 0.1)', borderRadius: '16px' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '1rem', color: '#f87171' }}>

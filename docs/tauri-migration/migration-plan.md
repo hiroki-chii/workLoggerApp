@@ -14,7 +14,7 @@
 | D-08 | Rust が DB を所有する | 既存 DB への WAL 設定も書き込みになる | Phase 3 は既存 DB を読み取り専用で開く。書き込み開始と接続モード変更は Phase 4 で行う。 |
 | D-09 | PowerShell と Win32 は未取得値を同一視する | PowerShell は `"None"` / `null`、空タイトル / `null` を返す場合がある | いずれも既存 collector では保存しない。比較時に「未取得」へ正規化し、保存仕様を変更しない。 |
 | D-10 | 電源状態をバックエンドで扱う | Electron は `powerMonitor` の suspend/resume callback で collector を止めて復帰する | Tauri/Wry の公開 API には同等 callback がない。サスペンド中は worker thread も停止して記録されず、復帰後の最初の Win32 sample と既存の timeout/retry 経路で監視を再開する。外部から観測できる記録・通知・再開の仕様を変えず、raw Win32 message hook は導入しない。 |
-| D-11 | Tauri 版は React の全 Desktop API を提供する | Phase 3–7 時点の Tauri adapter は読み取り・常駐操作だけで、設定更新、ポモドーロ、ログ削除、疲労リセット、ルール編集が未接続 | 同じ Desktop API 名と引数を保つ Tauri command を追加し、既存 SQLite の更新 SQL と event 契約を Rust に移す。Electron 削除は全 command の互換検証後に限る。 |
+| D-11 | Tauri 版は React の全 Desktop API を提供する | Phase 3–7 時点では未接続機能があった | Phase 8 で設定更新、ポモドーロ、ログ削除、疲労リセット、ルール編集、event 契約を Rust に移し、互換確認後に Electron を削除した。 |
 | D-12 | Renderer 間の更新通知は Tauri event で同期する | Electron は `window-event:notify` IPC を main/mini の両 renderer へ中継する | `notifyAppChanged` と記録開始・停止 command から `activity-updated` を emit し、既存の `onAppChanged` 購読を維持する。 |
 
 ## 実装 Phase
@@ -86,14 +86,14 @@
 
 完了条件: Main/mini/Tray/再起動/休止復帰の操作が現行と一致する。Rust 単体テスト、既存 Electron テスト、Tauri debug build で検証する。
 
-### Phase 8 — 配布と Electron 削除（配布検証完了・削除保留）
+### Phase 8 — 配布と Electron 削除（完了）
 
 - NSIS installer の生成、新規インストール、隔離 DB での起動、アンインストールを検証した。記録は [release-validation.md](./release-validation.md) に残す。
 - Tauri command に設定更新、ポモドーロ、ログ削除、疲労リセット、ルール編集、renderer 間同期を追加し、Electron API との操作契約を移した。
 - PowerShell helper は `src-tauri/resources/monitor.ps1` に同梱し、緊急切替用として維持する。
-- 実データ環境での一日常駐・スリープ復帰・通知と既存 DB の手動確認後に、Electron、Express、Better-SQLite3、旧テストを削除する。
+- Tauri 環境での確認完了後、Electron、Express、Better-SQLite3、Electron 専用テストを削除した。確認完了はユーザーから報告された。
 
-完了条件: `npm run tauri build` の配布物だけで必要な全機能が稼働し、上記の実データ確認を終えること。Electron 削除は不可逆なため、その完了を明示してから実行する。
+完了条件: `npm run tauri build` の配布物だけで必要な全機能が稼働し、Tauri 環境での確認を終えること。完了。
 
 ## 最終ディレクトリ設計
 
