@@ -215,6 +215,41 @@ const PetIcon = ({ status, size = 40 }) => {
   );
 };
 
+const PET_PREVIEW_STATES = [
+  { status: 'Restored', label: '回復', motion: '元気に跳ねます' },
+  { status: 'Calm', label: '穏やか', motion: 'ゆっくり浮かびます' },
+  { status: 'Focused', label: '集中', motion: 'きらめきながら小さく伸び縮みします' },
+  { status: 'Strained', label: '疲れ気味', motion: '左右に歩きます' },
+  { status: 'Critical', label: '限界', motion: '左右に速く歩きます' }
+];
+
+const PetPreview = () => {
+  const [status, setStatus] = useState('Restored');
+  const selected = PET_PREVIEW_STATES.find(state => state.status === status);
+
+  return (
+    <section className="card pet-preview" aria-labelledby="pet-preview-title">
+      <h2 id="pet-preview-title" className="card-title">ペットのアニメーション</h2>
+      <p className="pet-preview-description">状態を選ぶと、ミニ画面のペットの動きを確認できます。</p>
+      <div className="pet-preview-content">
+        <div className="pet-preview-stage" role="img" aria-label={`${selected.label}（${status}）のペット：${selected.motion}`}>
+          <PetIcon key={status} status={status} size={80} />
+        </div>
+        <div className="pet-preview-controls">
+          <label htmlFor="pet-preview-status">プレビューする状態</label>
+          <select id="pet-preview-status" value={status} onChange={event => setStatus(event.target.value)}>
+            {PET_PREVIEW_STATES.map(state => (
+              <option key={state.status} value={state.status}>{state.label}（{state.status}）</option>
+            ))}
+          </select>
+          <p className="pet-preview-description" aria-live="polite">{selected.motion}</p>
+          <p className="pet-preview-description">プレビューは実際の疲労状態や記録には影響しません。</p>
+        </div>
+      </div>
+    </section>
+  );
+};
+
 const Logo = ({ size = 32, className = "" }) => {
   return (
     <svg
@@ -1123,6 +1158,7 @@ function App() {
                   </div>
                 </div>
               </section>
+              <PetPreview />
             </div>
           </>
         );

@@ -1003,6 +1003,62 @@ select option {
 }
 
 /* ペット用のアニメーション定義 */
+.pet-preview {
+  margin-top: 1.5rem;
+}
+
+.pet-preview-description {
+  color: var(--text-muted);
+  font-size: 0.85rem;
+  line-height: 1.6;
+}
+
+.pet-preview-content {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 1.5rem;
+  margin-top: 1rem;
+}
+
+.pet-preview-stage {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 160px;
+  height: 120px;
+  flex-shrink: 0;
+  border-radius: 16px;
+  background: var(--gradient-1);
+  border: 1px solid var(--border);
+}
+
+.pet-preview-controls {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.5rem;
+  min-width: 0;
+  flex: 1 1 220px;
+  font-size: 0.85rem;
+}
+
+.pet-preview-controls select {
+  padding: 0.5rem 0.75rem;
+  max-width: 100%;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: var(--bg-dark);
+  color: var(--text-main);
+  font: inherit;
+  cursor: pointer;
+}
+
+.pet-preview-controls select:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
+}
+
 .app-hidden:not(.mini-mode) *, .app-hidden:not(.mini-mode) *::before, .app-hidden:not(.mini-mode) *::after {
   animation-play-state: paused !important;
 }
